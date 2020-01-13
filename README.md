@@ -8,7 +8,7 @@ Place in `<head>` with `defer` or at the bottom of `<body>`:
 
 ## Register An Event Listener
 
-    <element sd-on:eventName="reference" />
+    <element sd-on="eventName:reference" />
 
 Available on `this` within the function:
 
@@ -29,7 +29,7 @@ Available on `this` within the function:
 
 ## Bind Attributes
 
-    <element sd-attr:attribute="reference" />
+    <element sd-attr="attribute:reference" />
 
 Available on `this` within the function:
 
@@ -42,7 +42,7 @@ If `reference` evaluates to `undefined`, the attribute will be removed from the 
 
 ## Toggle Classes
 
-    <element sd-class:class="reference" />
+    <element sd-class="class:reference" />
 
 Available on `this` within the function:
 
@@ -53,7 +53,7 @@ If `reference` evaluates truthy, the given class will exist in the element's cla
 
 ## Create A Bound Loop
 
-    <element sd-for:item="reference" />
+    <element sd-for="item:reference" />
 
 Available on `this` within the function:
 
