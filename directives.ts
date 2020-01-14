@@ -18,13 +18,28 @@ Create a bound loop:
 Add a condition:
     <element sd-if="reference">
 
-`reference` can be a function, string, or number using object dot and bracket notation.
+`reference` above can be a function, string, or number using object dot and bracket notation.
 
-Note: This script does not handle misuse; onus is on the dev to make sure inputs are valid.
+Refresh directives:
+    directives.refresh()
 
 */
 interface ArrayConstructor {
     from(arrayLike: any, mapFn?, thisArg?): Array<any>;
+}
+interface Directives {
+    refreshRate: number;
+    register: Function;
+    unregister: Function;
+}
+interface SdForContext {
+    element: HTMLElement,
+    itemName: string,
+    reference: string,
+    value: object | any[]
+}
+interface Window {
+    directives: Directives;
 }
 (function() {
     let elCount = 1;
@@ -38,8 +53,9 @@ interface ArrayConstructor {
         on: []
     };
     const getRef = function(refStr: string) {
-        let hasBrackets = refStr.indexOf("[") > -1;
-        let hasDots = refStr.indexOf(".") > -1;
+        // TODO: if this reference is inside of an sd-for, we also need to allow access to `(itemName)` as though it's on `window` (+ add to usage docs)
+        let hasBrackets = refStr.indexOf("[") !== -1;
+        let hasDots = refStr.indexOf(".") !== -1;
         let reference;
         if (!hasBrackets && !hasDots) {
             reference = window[refStr];
@@ -73,84 +89,108 @@ interface ArrayConstructor {
         }
         return reference;
     };
-    const getIfState = function(el: HTMLElement) {
-        if (el.hasAttribute("sd-if") && !getRef(el.getAttribute("sd-if"))) {
-            return false;
-        } else if (el === document.body) {
-            return true;
-        } else {
-            return getIfState(el.parentElement);
-        }
+    const unregisterDirectives = function(el: HTMLElement, ignore?: string) {
+        let indexToRemove: number;
+        ["attr", "class", "for", "html", "if", "on"].forEach(function(directiveName) {
+            if (binds[directiveName].length) {
+                if (el === document.body) {
+                    if (directiveName === "on") {
+                        binds.on.forEach(function(bindObj) {
+                            bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                        });
+                    }
+                    binds[directiveName].length = 0;
+                } else {
+                    binds[directiveName].map(function(bindObj) {
+                        if (el.contains(bindObj.element)) {
+                            return false;
+                        }
+                        return bindObj;
+                    });
+                    if (binds[directiveName].indexOf(false) !== -1) {
+                        while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
+                            binds[directiveName].splice(indexToRemove, 1);
+                        }
+                    }
+                }
+            }
+        });
     };
-    // TODO: give dev ability to call this from the outside
-    const registerDirectives = function(el: HTMLElement) {
+    const registerDirectives = function(el: HTMLElement, sdForContext?: SdForContext, sdForIndex?: number) {
+        let isFalsyIf = false;
         let isLoop = false;
-        if (el === document.body) {
-            unregisterDirectives();
+        if (!elCount) {
             elCount = 1;
         }
-        if (el.hasAttribute('sd-if')) {
-            let value = getRef(el.getAttribute('sd-if'));
-            binds.if.push({
-                element: el,
-                reference: el.getAttribute('sd-if'),
-                value
-            });
-            if (!value) {
-                el.style.display = "none";
+        unregisterDirectives(el);
+        ["if", "for", "html", "attr", "class", "on"].some(function(directiveName) {
+            if (!el.hasAttribute("sd-" + directiveName)) {
                 return;
-            } else {
-                el.style.display = null;
             }
-        }
-        if (el.hasAttribute('sd-for')) {
-            let params = el.getAttribute('sd-for').split(':');
-            binds.for.push({
-                element: el,
-                itemName: params[0],
-                reference: params[1]
+            let toBind: any[];
+            if (["attr"].indexOf(directiveName) !== 1 && el.getAttribute("sd-attr").indexOf(";") !== -1) {
+                toBind = el.getAttribute("sd-" + directiveName).split(";");
+            } else {
+                toBind = [el.getAttribute("sd-" + directiveName)];
+            }
+            toBind.forEach(function(attrParts) {
+                let bindObj: any = {element: el};
+                if (["if", "html"].indexOf(directiveName) !== -1) {
+                    bindObj.reference = attrParts;
+                } else {
+                    attrParts = attrParts.split(':');
+                    switch (directiveName) {
+                        case "attr": bindObj.attributeName = attrParts[0]; break;
+                        case "class": bindObj.className = attrParts[0]; break;
+                        case "for": bindObj.itemName = attrParts[0]; break;
+                        case "on": bindObj.eventName = attrParts[0]; break;
+                    }
+                    bindObj.reference = attrParts[1];
+                }
+                if (directiveName === "on") {
+                    bindObj.listener = function(event) {
+                        getRef(bindObj.reference).call({
+                            element: el,
+                            event
+                        });
+                    };
+                    el.addEventListener(bindObj.eventName, bindObj.listener);
+                }
+                bindObj.value = getRef(bindObj.reference);
+                if (sdForContext) {
+                    if (Array.isArray(sdForContext.value)) {
+                        bindObj[sdForContext.itemName] = {
+                            key: sdForIndex,
+                            index: sdForIndex,
+                            item: sdForContext.value[sdForIndex],
+                            value: sdForContext.value[sdForIndex]
+                        };
+                    } else {
+                        let key = Object.keys(sdForContext.value)[sdForIndex];
+                        bindObj[sdForContext.itemName] = {
+                            key: key,
+                            index: sdForIndex,
+                            item: sdForContext.value[key],
+                            value: sdForContext.value[key]
+                        };
+                    }
+                }
+                binds[directiveName].push(bindObj);
+                if (directiveName === "if") {
+                    if (!bindObj.value) {
+                        el.style.display = "none";
+                        isFalsyIf = true;
+                        return;
+                    } else {
+                        el.style.display = null;
+                    }
+                } else if (directiveName === "for") {
+                    isLoop = true;
+                }
             });
-            isLoop = true;
-        }
-        if (el.hasAttribute('sd-html')) {
-            binds.html.push({
-                element: el,
-                reference: el.getAttribute('sd-if')
-            });
-        }
-        if (el.hasAttribute('sd-attr')) {
-            // TODO: support semicolon-separated values ala sd-attr"attribute:reference;attribute:reference"
-            let params = el.getAttribute('sd-attr').split(':');
-            binds.attr.push({
-                attributeName: params[0],
-                element: el,
-                reference: params[1]
-            });
-        }
-        if (el.hasAttribute('sd-class')) {
-            // TODO: support semicolon-separated values ala sd-class"class:reference;class:reference"
-            let params = el.getAttribute('sd-class').split(':');
-            binds.class.push({
-                className: params[0],
-                element: el,
-                reference: params[1]
-            });
-        }
-        if (el.hasAttribute('sd-on')) {
-            // TODO: support semicolon-separated values ala sd-on"event:reference;event:reference"
-            let params = el.getAttribute('sd-on').split(':');
-            const listener = function(event) {
-                getRef(params[1]).call({
-                    element: el,
-                    event
-                });
-            };
-            binds.on.push({
-                element: el,
-                eventName: params[0],
-                listener
-            });
-            el.addEventListener(params[0], listener);
+        });
+        if (isFalsyIf) {
+            return;
         }
         if (!isLoop) {
             elCount += el.children.length;
@@ -164,83 +204,80 @@ interface ArrayConstructor {
         }
     };
     const runBinds = function() {
+        let indexToRemove: number;
         runBindsRunning = true;
-        // TODO: if an sd-if was previously falsy and is now truthy, show the sd-if element and run registerDirectives against it
-        // TODO: if we end up building the content for an sd-for, run registerDirectives against the sd-for element
-        binds.attr.forEach(function(bindObj) {
-            let value = getRef(bindObj.reference);
-            if (typeof value === "function") {
-                value = value();
-            }
-            if (bindObj.value && bindObj.value === value) {
-                return;
-            }
-            bindObj.value = value;
-            if (typeof value === "undefined") {
-                if (bindObj.element.hasAttribute(bindObj.attributeName)) {
-                    bindObj.element.removeAttribute(bindObj.attributeName);
+        // TODO: if running a directive that is a child of an sd-for, we need to include the `item` data on `this` in the function
+        ["if", "for", "attr", "class", "html"].forEach(function(directiveName) {
+            binds[directiveName].forEach(function(bindObj, bindIndex) {
+                if (!bindObj.element.parentElement) {
+                    binds[directiveName][bindIndex] = false;
+                    return;
                 }
-            } else {
-                bindObj.element.setAttribute(bindObj.attributeName, value);
-            }
-        });
-        binds.class.forEach(function(bindObj) {
-            let value = getRef(bindObj.reference);
-            if (typeof value === "function") {
-                value = value();
-            }
-            if (typeof value !== "boolean") {
-                value = !!value;
-            }
-            if (bindObj.value && bindObj.value === value) {
-                return;
-            }
-            bindObj.value = value;
-            if (!value) {
-                if (bindObj.element.classList.contains(bindObj.className)) {
-                    bindObj.element.classList.remove(bindObj.className);
+                let value = getRef(bindObj.reference);
+                if (typeof value === "function") {
+                    value = value();
                 }
-            } else if (!bindObj.element.classList.contains(bindObj.className)) {
-                bindObj.element.classList.add(bindObj.className);
-            }
-        });
-        binds.html.forEach(function(bindObj) {
-            let value = getRef(bindObj.reference);
-            if (typeof value === "function") {
-                value = value();
-            }
-            if (bindObj.value && bindObj.value === value) {
-                return;
-            }
-            bindObj.value = !!value;
-            bindObj.element.innerHTML = value;
-        });
-        setTimeout(runBinds, 100);
-        // TODO: give dev ability to override refresh rate
-        // TODO: give dev ability to stop the runBinds loop
-    };
-    const unregisterDirectives = function() {
-        if (binds.attr.length) {
-            binds.attr.length = 0;
-        }
-        if (binds.class.length) {
-            binds.class.length = 0;
-        }
-        if (binds.for.length) {
-            binds.for.length = 0;
-        }
-        if (binds.html.length) {
-            binds.html.length = 0;
-        }
-        if (binds.if.length) {
-            binds.if.length = 0;
-        }
-        if (binds.on.length) {
-            binds.on.forEach(function(bindObj) {
-                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
+                    value = !!value;
+                }
+                if (bindObj.value && bindObj.value === value) {
+                    return;
+                }
+                if (directiveName === "for") {
+                    value = bindObj.innerHTML.repeat(Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length);
+                }
+                bindObj.value = value;
+                switch (directiveName) {
+                    case "if":
+                        if (value) {
+                            bindObj.element.style.display = null;
+                            registerDirectives(bindObj.element);
+                        } else {
+                            bindObj.element.style.display = "none";
+                            unregisterDirectives(bindObj.element, "if");
+                        }
+                        break;
+                    case "for":
+                    case "html":
+                        Array.from(bindObj.element.children).forEach(function(child) {
+                            unregisterDirectives(child);
+                        });
+                        bindObj.element.innerHTML = value;
+                        Array.from(bindObj.element.children).forEach(function(child, index) {
+                            if (directiveName === "for") {
+                                registerDirectives(child, bindObj, index);
+                            } else {
+                                registerDirectives(child);
+                            }
+                        });
+                        break;
+                    case "attr":
+                        if (typeof value === "undefined") {
+                            if (bindObj.element.hasAttribute(bindObj.attributeName)) {
+                                bindObj.element.removeAttribute(bindObj.attributeName);
+                            }
+                        } else {
+                            bindObj.element.setAttribute(bindObj.attributeName, value);
+                        }
+                        break;
+                    case "class":
+                        if (!value) {
+                            if (bindObj.element.classList.contains(bindObj.className)) {
+                                bindObj.element.classList.remove(bindObj.className);
+                            }
+                        } else if (!bindObj.element.classList.contains(bindObj.className)) {
+                            bindObj.element.classList.add(bindObj.className);
+                        }
+                        break;
+                }
             });
-            binds.on.length = 0;
-        }
+            if (binds[directiveName].indexOf(false) !== -1) {
+                while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
+                    binds[directiveName].splice(indexToRemove, 1);
+                }
+            }
+        });
+        setTimeout(runBinds, window.directives.refreshRate);
     };
     if (document.readyState != "loading") {
         registerDirectives(document.body);
@@ -249,4 +286,9 @@ interface ArrayConstructor {
             registerDirectives(document.body);
         });
     }
+    window.directives = {
+        refreshRate: 100,
+        register: () => registerDirectives(document.body),
+        unregister: () => unregisterDirectives(document.body)
+    };
 })();
