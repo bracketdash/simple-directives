@@ -36,13 +36,14 @@ interface SdForContext {
     element: HTMLElement,
     itemName: string,
     reference: string,
-    value: object | any[]
+    value: Object | any[]
 }
 interface Window {
     directives: Directives;
 }
 (function() {
     let elCount = 1;
+    let runBinds: Function;
     let runBindsRunning = false;
     const binds = {
         attr: [],
@@ -127,7 +128,7 @@ interface Window {
         unregisterDirectives(el);
         ["if", "for", "html", "attr", "class", "on"].some(function(directiveName) {
             if (!el.hasAttribute("sd-" + directiveName)) {
-                return;
+                return false;
             }
             let toBind: any[];
             if (["attr"].indexOf(directiveName) !== 1 && el.getAttribute("sd-attr").indexOf(";") !== -1) {
@@ -184,7 +185,7 @@ interface Window {
                     if (!bindObj.value) {
                         el.style.display = "none";
                         isFalsyIf = true;
-                        return;
+                        return true;
                     } else {
                         el.style.display = null;
                     }
@@ -207,7 +208,7 @@ interface Window {
             runBinds();
         }
     };
-    const runBinds = function() {
+    runBinds = function() {
         let indexToRemove: number;
         runBindsRunning = true;
         ["if", "for", "attr", "class", "html"].forEach(function(directiveName) {
