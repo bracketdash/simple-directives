@@ -53,7 +53,9 @@ interface Window {
         on: []
     };
     const getRef = function(refStr: string) {
-        // TODO: if this reference is inside of an sd-for, we also need to allow access to `(itemName)` as though it's on `window` (+ add to usage docs)
+        // TODO: if this reference is inside of an sd-for, we also need to allow access to `(itemName)` as though it's on `window`
+            // add a note to the docs saying references will have access to items in sd-for as though they are on `window`
+            // we'll need to pass additional data to getRef()
         let hasBrackets = refStr.indexOf("[") !== -1;
         let hasDots = refStr.indexOf(".") !== -1;
         let reference;
@@ -149,6 +151,7 @@ interface Window {
                 }
                 if (directiveName === "on") {
                     bindObj.listener = function(event) {
+                        // TODO: will need to add sd-for item to getRef *AND the call object* here if !!sdForContext
                         getRef(bindObj.reference).call({
                             element: el,
                             event
@@ -156,7 +159,6 @@ interface Window {
                     };
                     el.addEventListener(bindObj.eventName, bindObj.listener);
                 }
-                bindObj.value = getRef(bindObj.reference);
                 if (sdForContext) {
                     if (Array.isArray(sdForContext.value)) {
                         bindObj[sdForContext.itemName] = {
@@ -177,6 +179,8 @@ interface Window {
                 }
                 binds[directiveName].push(bindObj);
                 if (directiveName === "if") {
+                    // TODO: will need to add sd-for item to getRef here if !!sdForContext
+                    bindObj.value = getRef(bindObj.reference);
                     if (!bindObj.value) {
                         el.style.display = "none";
                         isFalsyIf = true;
@@ -206,16 +210,18 @@ interface Window {
     const runBinds = function() {
         let indexToRemove: number;
         runBindsRunning = true;
-        // TODO: if running a directive that is a child of an sd-for, we need to include the `item` data on `this` in the function
         ["if", "for", "attr", "class", "html"].forEach(function(directiveName) {
             binds[directiveName].forEach(function(bindObj, bindIndex) {
                 if (!bindObj.element.parentElement) {
                     binds[directiveName][bindIndex] = false;
                     return;
                 }
+                // TODO: will need to add sd-for item to getRef here if bindObj.element is a child of an sd-for
                 let value = getRef(bindObj.reference);
                 if (typeof value === "function") {
-                    value = value();
+                    // TODO: will need to add sd-for item to the call object here if bindObj.element is a child of an sd-for
+                    value = value.call({
+                    });
                 }
                 if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
                     value = !!value;
