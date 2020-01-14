@@ -6,9 +6,10 @@ Place in `<head>` with `defer` or at the bottom of `<body>`:
 
 `reference` below can be a reference to a function, string, or number using object dot and bracket notation.
 
-## Register An Event Listener
+## Add Event Listeners
 
     <element sd-on="eventName:reference" />
+    <element sd-on="event1:reference2;event2:reference2;...">
 
 Available on `this` within the function:
 
@@ -30,6 +31,7 @@ Available on `this` within the function:
 ## Bind Attributes
 
     <element sd-attr="attribute:reference" />
+    <element sd-attr="attribute1:reference1;attribute2:reference2;...">
 
 Available on `this` within the function:
 
@@ -43,6 +45,7 @@ If `reference` evaluates to `undefined`, the attribute will be removed from the 
 ## Toggle Classes
 
     <element sd-class="class:reference" />
+    <element sd-class="class1:reference2;class1:reference2;...">
 
 Available on `this` within the function:
 
@@ -75,7 +78,7 @@ Available on `this` within functions referenced within the loop if looping over 
 -   `[item].key`
 -   `[item].value`
 
-## Add Conditions
+## Add A Condition
 
     <element sd-if="reference" />
 
@@ -84,11 +87,3 @@ Available on `this` within the function:
 -   `element`
 
 If `reference` evaluates falsy, the element will be hidden and any bindings within will be paused.
-
-## Set The Refresh Rate
-
-    <element sd-refresh="milliseconds" />
-
-If set, any bindings on the element will only refresh every `milliseconds` milliseconds.
-
-This won't do anything for `sd-on` since there's nothing to refresh.
