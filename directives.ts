@@ -144,16 +144,24 @@ interface Window {
                 toBind = [el.getAttribute("sd-" + directiveName)];
             }
             toBind.forEach(function(attrParts) {
-                let bindObj: any = {element: el};
+                let bindObj: any = { element: el };
                 if (["if", "html"].indexOf(directiveName) !== -1) {
                     bindObj.reference = attrParts;
                 } else {
-                    attrParts = attrParts.split(':');
+                    attrParts = attrParts.split(":");
                     switch (directiveName) {
-                        case "attr": bindObj.attributeName = attrParts[0]; break;
-                        case "class": bindObj.className = attrParts[0]; break;
-                        case "for": bindObj.itemName = attrParts[0]; break;
-                        case "on": bindObj.eventName = attrParts[0]; break;
+                        case "attr":
+                            bindObj.attributeName = attrParts[0];
+                            break;
+                        case "class":
+                            bindObj.className = attrParts[0];
+                            break;
+                        case "for":
+                            bindObj.itemName = attrParts[0];
+                            break;
+                        case "on":
+                            bindObj.eventName = attrParts[0];
+                            break;
                     }
                     bindObj.reference = attrParts[1];
                 }
@@ -180,7 +188,7 @@ interface Window {
                     }
                 }
                 if (directiveName === "on") {
-                    bindObj.listener = function(event) {                        
+                    bindObj.listener = function(event) {
                         let getRefData = {};
                         let callObject: any = {
                             element: el,
@@ -280,7 +288,9 @@ interface Window {
                     return;
                 }
                 if (directiveName === "for") {
-                    value = bindObj.innerHTML.repeat(Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length);
+                    value = bindObj.innerHTML.repeat(
+                        Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length
+                    );
                 }
                 bindObj.value = value;
                 switch (directiveName) {
@@ -335,6 +345,12 @@ interface Window {
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
+    window.directives = {
+        baseReference: window,
+        refreshRate: 100,
+        register: registerDirectives,
+        unregister: unregisterDirectives
+    };
     if (document.readyState != "loading") {
         registerDirectives(document.body);
     } else {
@@ -342,10 +358,4 @@ interface Window {
             registerDirectives(document.body);
         });
     }
-    window.directives = {
-        baseReference: window,
-        refreshRate: 100,
-        register: registerDirectives,
-        unregister: unregisterDirectives
-    };
 })();

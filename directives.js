@@ -136,7 +136,7 @@ window.directives:
                     bindObj.reference = attrParts;
                 }
                 else {
-                    attrParts = attrParts.split(':');
+                    attrParts = attrParts.split(":");
                     switch (directiveName) {
                         case "attr":
                             bindObj.attributeName = attrParts[0];
@@ -341,6 +341,12 @@ window.directives:
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
+    window.directives = {
+        baseReference: window,
+        refreshRate: 100,
+        register: registerDirectives,
+        unregister: unregisterDirectives
+    };
     if (document.readyState != "loading") {
         registerDirectives(document.body);
     }
@@ -349,10 +355,4 @@ window.directives:
             registerDirectives(document.body);
         });
     }
-    window.directives = {
-        baseReference: window,
-        refreshRate: 100,
-        register: registerDirectives,
-        unregister: unregisterDirectives
-    };
 })();
