@@ -67,7 +67,7 @@ Available on `this` within the function:
 
 The contents of the element will be repeated once for each item.
 
-`index`, `key`, `item`, and `value` will be available at `(itemName)` in references and on `this` in functions within.
+`index`, `key`, `item`, `value` and `collection` will be available at `(itemName)` in references and on `this` in functions within.
 
 ## Add A Condition
 

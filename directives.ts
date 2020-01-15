@@ -217,6 +217,7 @@ interface Window {
                     bindObj.itemNames.push(sdForContext.itemName);
                     if (Array.isArray(sdForContext.value)) {
                         bindObj[sdForContext.itemName] = {
+                            collection: sdForContext.value,
                             key: sdForIndex,
                             index: sdForIndex,
                             item: sdForContext.value[sdForIndex],
@@ -225,6 +226,7 @@ interface Window {
                     } else {
                         let key = Object.keys(sdForContext.value)[sdForIndex];
                         bindObj[sdForContext.itemName] = {
+                            collection: sdForContext.value,
                             key: key,
                             index: sdForIndex,
                             item: sdForContext.value[key],
