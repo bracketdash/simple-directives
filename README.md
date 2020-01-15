@@ -9,7 +9,7 @@ Place in `<head>` with `defer` or at the bottom of `<body>`:
 ## Add Event Listeners
 
     <element sd-on="eventName:reference" />
-    <element sd-on="event1:reference2;event2:reference2;...">
+    <element sd-on="event1:reference1;event2:reference2;...">
 
 Available on `this` within the function:
 
@@ -45,7 +45,7 @@ If `reference` evaluates to `undefined`, the attribute will be removed from the 
 ## Toggle Classes
 
     <element sd-class="class:reference" />
-    <element sd-class="class1:reference2;class1:reference2;...">
+    <element sd-class="class1:reference1;class2:reference2;...">
 
 Available on `this` within the function:
 

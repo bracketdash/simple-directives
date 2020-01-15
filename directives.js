@@ -4,7 +4,7 @@ A Simple Directives Library
 
 Add event listeners:
     <element sd-on="event:reference">
-    <element sd-on="event1:reference2;event2:reference2;...">
+    <element sd-on="event1:reference1;event2:reference2;...">
 Bind contents:
     <element sd-html="reference">
 Bind attributes:
@@ -12,7 +12,7 @@ Bind attributes:
     <element sd-attr="attribute1:reference1;attribute2:reference2;...">
 Toggle classes:
     <element sd-class="class:reference">
-    <element sd-class="class1:reference2;class1:reference2;...">
+    <element sd-class="class1:reference1;class2:reference2;...">
 Create a bound loop:
     <element sd-for="item:reference">
 Add a condition:
