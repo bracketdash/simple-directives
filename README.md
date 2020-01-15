@@ -79,6 +79,18 @@ Available on `this` within the function:
 
 If `reference` evaluates falsy, the element will be hidden and any bindings within will be paused.
 
+## Add Arguments To A Function Reference
+
+    <element sd-on="event:reference:arg1:arg2:...">
+    <element sd-on="event1:reference1:arg1:arg2:...;event2,event3:reference2:;...">
+    <element sd-html="reference:arg1:arg2:...">
+    <element sd-attr="attribute:reference:arg1:arg2:...">
+    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
+    <element sd-class="class:reference:arg1:arg2:...">
+    <element sd-class="class1:reference1:arg1:arg2:...;class2,class3:!reference2;...">
+    <element sd-for="item:reference:arg1:arg2:...">
+    <element sd-if="reference:arg1:arg2:...">
+
 ## Available In Script
 
     directives.baseReference = object;

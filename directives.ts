@@ -1,22 +1,32 @@
 /*
 
 A Simple Directives Library
+https://github.com/bracketdash/simple-directives
 
 Add event listeners:
     <element sd-on="event:reference">
-    <element sd-on="event1:reference1;event2:reference2;...">
+    <element sd-on="event:reference:arg1:arg2:...">
+    <element sd-on="event1:reference1;event2,event3:reference2;...">
+    <element sd-on="event1:reference1:arg1:arg2:...;event2,event3:reference2:;...">
 Bind contents:
     <element sd-html="reference">
+    <element sd-html="reference:arg1:arg2:...">
 Bind attributes:
     <element sd-attr="attribute:reference">
+    <element sd-attr="attribute:reference:arg1:arg2:...">
     <element sd-attr="attribute1:reference1;attribute2:reference2;...">
+    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
 Toggle classes:
     <element sd-class="class:reference">
-    <element sd-class="class1:reference1;class2:reference2;...">
+    <element sd-class="class:reference:arg1:arg2:...">
+    <element sd-class="class1:reference1;class2,class3:!reference2;...">
+    <element sd-class="class1:reference1:arg1:arg2:...;class2,class3:!reference2;...">
 Create a bound loop:
     <element sd-for="item:reference">
+    <element sd-for="item:reference:arg1:arg2:...">
 Add a condition:
     <element sd-if="reference">
+    <element sd-if="reference:arg1:arg2:...">
 
 `reference` above can be a function, string, or number using object dot and bracket notation.
 
@@ -61,8 +71,19 @@ interface Window {
         let hasBrackets = refStr.indexOf("[") !== -1;
         let hasDots = refStr.indexOf(".") !== -1;
         let reference;
+        let returnOpposite = false;
+        if (refStr.indexOf("!") === 0) {
+            refStr = refStr.substring(1);
+            returnOpposite = true;
+        }
         if (!hasBrackets && !hasDots) {
-            reference = window[refStr];
+            let baseRef = window.directives.baseReference;
+            if (data) {
+                Object.keys(data).forEach(function(key) {
+                    baseRef[key] = data[key];
+                });
+            }
+            reference = baseRef[refStr];
         }
         if (hasBrackets) {
             let bracketsLoop = function(loopRef) {
@@ -97,6 +118,9 @@ interface Window {
                 }
             });
         }
+        if (returnOpposite) {
+            return !reference;
+        }
         return reference;
     };
     const unregisterDirectives = function(el: HTMLElement, ignore?: string) {
@@ -106,13 +130,28 @@ interface Window {
                 if (el === document.body) {
                     if (directiveName === "on") {
                         binds.on.forEach(function(bindObj) {
-                            bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                            if (bindObj.eventName.indexOf(",") !== -1) {
+                                bindObj.eventName.split(",").forEach(function(singleEventName) {
+                                    bindObj.element.removeEventListener(singleEventName, bindObj.listener);
+                                });
+                            } else {
+                                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                            }
                         });
                     }
                     binds[directiveName].length = 0;
                 } else {
                     binds[directiveName].map(function(bindObj) {
                         if (el.contains(bindObj.element)) {
+                            if (directiveName === "on") {
+                                if (bindObj.eventName.indexOf(",") !== -1) {
+                                    bindObj.eventName.split(",").forEach(function(singleEventName) {
+                                        bindObj.element.removeEventListener(singleEventName, bindObj.listener);
+                                    });
+                                } else {
+                                    bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                                }
+                            }
                             return false;
                         }
                         return bindObj;
@@ -143,12 +182,15 @@ interface Window {
             } else {
                 toBind = [el.getAttribute("sd-" + directiveName)];
             }
-            toBind.forEach(function(attrParts) {
+            toBind.forEach(function(attrWhole) {
                 let bindObj: any = { element: el };
+                let attrParts = attrWhole.split(":");
                 if (["if", "html"].indexOf(directiveName) !== -1) {
-                    bindObj.reference = attrParts;
+                    bindObj.reference = attrParts[0];
+                    if (attrParts.length > 1) {
+                        bindObj.refArgs = attrParts.slice(1);
+                    }
                 } else {
-                    attrParts = attrParts.split(":");
                     switch (directiveName) {
                         case "attr":
                             bindObj.attributeName = attrParts[0];
@@ -164,6 +206,9 @@ interface Window {
                             break;
                     }
                     bindObj.reference = attrParts[1];
+                    if (attrParts.length > 2) {
+                        bindObj.refArgs = attrParts.slice(2);
+                    }
                 }
                 if (sdForContext) {
                     if (!bindObj.itemNames) {
@@ -202,12 +247,18 @@ interface Window {
                                 value: bindObj[sdForContext.itemName].value
                             };
                             callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                            getRef(bindObj.reference, getRefData).call(callObject);
+                            getRef(bindObj.reference, getRefData).apply(callObject, bindObj.refArgs);
                         } else {
-                            getRef(bindObj.reference).call(callObject);
+                            getRef(bindObj.reference).apply(callObject, bindObj.refArgs);
                         }
                     };
-                    el.addEventListener(bindObj.eventName, bindObj.listener);
+                    if (bindObj.eventName.indexOf(",") !== -1) {
+                        bindObj.eventName.split(",").forEach(function(singleEventName) {
+                            bindObj.element.addEventListener(singleEventName, bindObj.listener);
+                        });
+                    } else {
+                        bindObj.element.addEventListener(bindObj.eventName, bindObj.listener);
+                    }
                 }
                 binds[directiveName].push(bindObj);
                 if (directiveName === "if") {
@@ -258,10 +309,26 @@ interface Window {
                     binds[directiveName][bindIndex] = false;
                     return;
                 }
+                let callObject: any = {
+                    element: bindObj.element
+                };
                 let value: any;
+                switch (directiveName) {
+                    case "attr":
+                        callObject.attributeName = bindObj.attributeName;
+                        break;
+                    case "class":
+                        callObject.className = bindObj.className;
+                        break;
+                    case "for":
+                        callObject.itemName = bindObj.itemName;
+                        break;
+                    case "on":
+                        callObject.eventName = bindObj.eventName;
+                        break;
+                }
                 if (!!bindObj.itemNames) {
                     let getRefData = {};
-                    let callObject = {};
                     bindObj.itemNames.forEach(function(itemName) {
                         getRefData[itemName] = {
                             key: bindObj[itemName].key,
@@ -273,12 +340,12 @@ interface Window {
                     });
                     value = getRef(bindObj.reference, getRefData);
                     if (typeof value === "function") {
-                        value = value.call(callObject);
+                        value = value.apply(callObject, bindObj.refArgs);
                     }
                 } else {
                     value = getRef(bindObj.reference);
                     if (typeof value === "function") {
-                        value = value();
+                        value = value.apply(callObject, bindObj.refArgs);
                     }
                 }
                 if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
@@ -318,7 +385,17 @@ interface Window {
                         });
                         break;
                     case "attr":
-                        if (typeof value === "undefined") {
+                        if (bindObj.attributeName.indexOf(",") !== -1) {
+                            bindObj.attributeName.split(",").forEach(function(singleAttributeName) {
+                                if (typeof value === "undefined") {
+                                    if (bindObj.element.hasAttribute(singleAttributeName)) {
+                                        bindObj.element.removeAttribute(singleAttributeName);
+                                    }
+                                } else {
+                                    bindObj.element.setAttribute(singleAttributeName, value);
+                                }
+                            });
+                        } else if (typeof value === "undefined") {
                             if (bindObj.element.hasAttribute(bindObj.attributeName)) {
                                 bindObj.element.removeAttribute(bindObj.attributeName);
                             }
@@ -327,7 +404,17 @@ interface Window {
                         }
                         break;
                     case "class":
-                        if (!value) {
+                        if (bindObj.className.indexOf(",") !== -1) {
+                            bindObj.className.split(",").forEach(function(singleClassName) {
+                                if (!value) {
+                                    if (bindObj.element.classList.contains(singleClassName)) {
+                                        bindObj.element.classList.remove(singleClassName);
+                                    }
+                                } else if (!bindObj.element.classList.contains(singleClassName)) {
+                                    bindObj.element.classList.add(singleClassName);
+                                }
+                            });
+                        } else if (!value) {
                             if (bindObj.element.classList.contains(bindObj.className)) {
                                 bindObj.element.classList.remove(bindObj.className);
                             }
@@ -352,10 +439,14 @@ interface Window {
         unregister: unregisterDirectives
     };
     if (document.readyState != "loading") {
-        registerDirectives(document.body);
+        setTimeout(function() {
+            registerDirectives(document.body);
+        });
     } else {
         document.addEventListener("DOMContentLoaded", function() {
-            registerDirectives(document.body);
+            setTimeout(function() {
+                registerDirectives(document.body);
+            });
         });
     }
 })();
