@@ -20,8 +20,11 @@ Add a condition:
 
 `reference` above can be a function, string, or number using object dot and bracket notation.
 
-Refresh directives:
-    directives.refresh()
+window.directives:
+    baseReference = object
+    refreshRate = milliseconds
+    register(parentElement)
+    unregister(parentElement)
 
 */
 (function () {
@@ -36,10 +39,7 @@ Refresh directives:
         if: [],
         on: []
     };
-    var getRef = function (refStr) {
-        // TODO: if this reference is inside of an sd-for, we also need to allow access to `(itemName)` as though it's on `window`
-        // add a note to the docs saying references will have access to items in sd-for as though they are on `window`
-        // we'll need to pass additional data to getRef()
+    var getRef = function (refStr, data) {
         var hasBrackets = refStr.indexOf("[") !== -1;
         var hasDots = refStr.indexOf(".") !== -1;
         var reference;
@@ -66,7 +66,13 @@ Refresh directives:
         if (hasDots) {
             refStr.split(".").forEach(function (refPart, index) {
                 if (!index) {
-                    reference = window[refPart];
+                    var baseRef = window.directives.baseReference;
+                    if (data) {
+                        Object.keys(data).forEach(function (key) {
+                            baseRef[key] = data[key];
+                        });
+                    }
+                    reference = baseRef[refPart];
                 }
                 else if (typeof reference === "object" && reference[refPart]) {
                     reference = reference[refPart];
@@ -147,17 +153,11 @@ Refresh directives:
                     }
                     bindObj.reference = attrParts[1];
                 }
-                if (directiveName === "on") {
-                    bindObj.listener = function (event) {
-                        // TODO: will need to add sd-for item to getRef *AND the call object* here if !!sdForContext
-                        getRef(bindObj.reference).call({
-                            element: el,
-                            event: event
-                        });
-                    };
-                    el.addEventListener(bindObj.eventName, bindObj.listener);
-                }
                 if (sdForContext) {
+                    if (!bindObj.itemNames) {
+                        bindObj.itemNames = [];
+                    }
+                    bindObj.itemNames.push(sdForContext.itemName);
                     if (Array.isArray(sdForContext.value)) {
                         bindObj[sdForContext.itemName] = {
                             key: sdForIndex,
@@ -176,10 +176,44 @@ Refresh directives:
                         };
                     }
                 }
+                if (directiveName === "on") {
+                    bindObj.listener = function (event) {
+                        var getRefData = {};
+                        var callObject = {
+                            element: el,
+                            event: event
+                        };
+                        if (sdForContext) {
+                            getRefData[sdForContext.itemName] = {
+                                key: bindObj[sdForContext.itemName].key,
+                                index: bindObj[sdForContext.itemName].index,
+                                item: bindObj[sdForContext.itemName].item,
+                                value: bindObj[sdForContext.itemName].value
+                            };
+                            callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
+                            getRef(bindObj.reference, getRefData).call(callObject);
+                        }
+                        else {
+                            getRef(bindObj.reference).call(callObject);
+                        }
+                    };
+                    el.addEventListener(bindObj.eventName, bindObj.listener);
+                }
                 binds[directiveName].push(bindObj);
                 if (directiveName === "if") {
-                    // TODO: will need to add sd-for item to getRef here if !!sdForContext
-                    bindObj.value = getRef(bindObj.reference);
+                    if (sdForContext) {
+                        var getRefData = {};
+                        getRefData[sdForContext.itemName] = {
+                            key: bindObj[sdForContext.itemName].key,
+                            index: bindObj[sdForContext.itemName].index,
+                            item: bindObj[sdForContext.itemName].item,
+                            value: bindObj[sdForContext.itemName].value
+                        };
+                        bindObj.value = getRef(bindObj.reference, getRefData);
+                    }
+                    else {
+                        bindObj.value = getRef(bindObj.reference);
+                    }
                     if (!bindObj.value) {
                         el.style.display = "none";
                         isFalsyIf = true;
@@ -217,11 +251,29 @@ Refresh directives:
                     binds[directiveName][bindIndex] = false;
                     return;
                 }
-                // TODO: will need to add sd-for item to getRef here if bindObj.element is a child of an sd-for
-                var value = getRef(bindObj.reference);
-                if (typeof value === "function") {
-                    // TODO: will need to add sd-for item to the call object here if bindObj.element is a child of an sd-for
-                    value = value.call({});
+                var value;
+                if (!!bindObj.itemNames) {
+                    var getRefData = {};
+                    var callObject = {};
+                    bindObj.itemNames.forEach(function (itemName) {
+                        getRefData[itemName] = {
+                            key: bindObj[itemName].key,
+                            index: bindObj[itemName].index,
+                            item: bindObj[itemName].item,
+                            value: bindObj[itemName].value
+                        };
+                        callObject[itemName] = getRefData[itemName];
+                    });
+                    value = getRef(bindObj.reference, getRefData);
+                    if (typeof value === "function") {
+                        value = value.call(callObject);
+                    }
+                }
+                else {
+                    value = getRef(bindObj.reference);
+                    if (typeof value === "function") {
+                        value = value();
+                    }
                 }
                 if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
                     value = !!value;
@@ -298,8 +350,9 @@ Refresh directives:
         });
     }
     window.directives = {
+        baseReference: window,
         refreshRate: 100,
-        register: function () { return registerDirectives(document.body); },
-        unregister: function () { return unregisterDirectives(document.body); }
+        register: registerDirectives,
+        unregister: unregisterDirectives
     };
 })();

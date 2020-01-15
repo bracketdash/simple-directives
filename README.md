@@ -67,16 +67,7 @@ Available on `this` within the function:
 
 The contents of the element will be repeated once for each item.
 
-Available on `this` within functions referenced within the loop if looping over an `array`:
-
--   `[item].index`
--   `[item].item`
-
-Available on `this` within functions referenced within the loop if looping over an `object`:
-
--   `[item].index`
--   `[item].key`
--   `[item].value`
+`index`, `key`, `item`, and `value` will be available at `(itemName)` in references and on `this` in functions within.
 
 ## Add A Condition
 
@@ -87,3 +78,10 @@ Available on `this` within the function:
 -   `element`
 
 If `reference` evaluates falsy, the element will be hidden and any bindings within will be paused.
+
+## Available In Script
+
+    directives.baseReference = object;
+    directives.refreshRate = milliseconds;
+    directives.register(parentElement);
+    directives.unregister(parentElement);

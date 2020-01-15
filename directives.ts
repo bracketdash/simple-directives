@@ -20,23 +20,27 @@ Add a condition:
 
 `reference` above can be a function, string, or number using object dot and bracket notation.
 
-Refresh directives:
-    directives.refresh()
+window.directives:
+    baseReference = object
+    refreshRate = milliseconds
+    register(parentElement)
+    unregister(parentElement)
 
 */
 interface ArrayConstructor {
     from(arrayLike: any, mapFn?, thisArg?): Array<any>;
 }
 interface Directives {
+    baseReference: Object;
     refreshRate: number;
     register: Function;
     unregister: Function;
 }
 interface SdForContext {
-    element: HTMLElement,
-    itemName: string,
-    reference: string,
-    value: Object | any[]
+    element: HTMLElement;
+    itemName: string;
+    reference: string;
+    value: Object | any[];
 }
 interface Window {
     directives: Directives;
@@ -53,10 +57,7 @@ interface Window {
         if: [],
         on: []
     };
-    const getRef = function(refStr: string) {
-        // TODO: if this reference is inside of an sd-for, we also need to allow access to `(itemName)` as though it's on `window`
-            // add a note to the docs saying references will have access to items in sd-for as though they are on `window`
-            // we'll need to pass additional data to getRef()
+    const getRef = function(refStr: string, data?: Object) {
         let hasBrackets = refStr.indexOf("[") !== -1;
         let hasDots = refStr.indexOf(".") !== -1;
         let reference;
@@ -82,7 +83,13 @@ interface Window {
         if (hasDots) {
             refStr.split(".").forEach(function(refPart, index) {
                 if (!index) {
-                    reference = window[refPart];
+                    let baseRef = window.directives.baseReference;
+                    if (data) {
+                        Object.keys(data).forEach(function(key) {
+                            baseRef[key] = data[key];
+                        });
+                    }
+                    reference = baseRef[refPart];
                 } else if (typeof reference === "object" && reference[refPart]) {
                     reference = reference[refPart];
                 } else {
@@ -150,17 +157,11 @@ interface Window {
                     }
                     bindObj.reference = attrParts[1];
                 }
-                if (directiveName === "on") {
-                    bindObj.listener = function(event) {
-                        // TODO: will need to add sd-for item to getRef *AND the call object* here if !!sdForContext
-                        getRef(bindObj.reference).call({
-                            element: el,
-                            event
-                        });
-                    };
-                    el.addEventListener(bindObj.eventName, bindObj.listener);
-                }
                 if (sdForContext) {
+                    if (!bindObj.itemNames) {
+                        bindObj.itemNames = [];
+                    }
+                    bindObj.itemNames.push(sdForContext.itemName);
                     if (Array.isArray(sdForContext.value)) {
                         bindObj[sdForContext.itemName] = {
                             key: sdForIndex,
@@ -178,10 +179,42 @@ interface Window {
                         };
                     }
                 }
+                if (directiveName === "on") {
+                    bindObj.listener = function(event) {                        
+                        let getRefData = {};
+                        let callObject: any = {
+                            element: el,
+                            event
+                        };
+                        if (sdForContext) {
+                            getRefData[sdForContext.itemName] = {
+                                key: bindObj[sdForContext.itemName].key,
+                                index: bindObj[sdForContext.itemName].index,
+                                item: bindObj[sdForContext.itemName].item,
+                                value: bindObj[sdForContext.itemName].value
+                            };
+                            callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
+                            getRef(bindObj.reference, getRefData).call(callObject);
+                        } else {
+                            getRef(bindObj.reference).call(callObject);
+                        }
+                    };
+                    el.addEventListener(bindObj.eventName, bindObj.listener);
+                }
                 binds[directiveName].push(bindObj);
                 if (directiveName === "if") {
-                    // TODO: will need to add sd-for item to getRef here if !!sdForContext
-                    bindObj.value = getRef(bindObj.reference);
+                    if (sdForContext) {
+                        let getRefData = {};
+                        getRefData[sdForContext.itemName] = {
+                            key: bindObj[sdForContext.itemName].key,
+                            index: bindObj[sdForContext.itemName].index,
+                            item: bindObj[sdForContext.itemName].item,
+                            value: bindObj[sdForContext.itemName].value
+                        };
+                        bindObj.value = getRef(bindObj.reference, getRefData);
+                    } else {
+                        bindObj.value = getRef(bindObj.reference);
+                    }
                     if (!bindObj.value) {
                         el.style.display = "none";
                         isFalsyIf = true;
@@ -217,12 +250,28 @@ interface Window {
                     binds[directiveName][bindIndex] = false;
                     return;
                 }
-                // TODO: will need to add sd-for item to getRef here if bindObj.element is a child of an sd-for
-                let value = getRef(bindObj.reference);
-                if (typeof value === "function") {
-                    // TODO: will need to add sd-for item to the call object here if bindObj.element is a child of an sd-for
-                    value = value.call({
+                let value: any;
+                if (!!bindObj.itemNames) {
+                    let getRefData = {};
+                    let callObject = {};
+                    bindObj.itemNames.forEach(function(itemName) {
+                        getRefData[itemName] = {
+                            key: bindObj[itemName].key,
+                            index: bindObj[itemName].index,
+                            item: bindObj[itemName].item,
+                            value: bindObj[itemName].value
+                        };
+                        callObject[itemName] = getRefData[itemName];
                     });
+                    value = getRef(bindObj.reference, getRefData);
+                    if (typeof value === "function") {
+                        value = value.call(callObject);
+                    }
+                } else {
+                    value = getRef(bindObj.reference);
+                    if (typeof value === "function") {
+                        value = value();
+                    }
                 }
                 if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
                     value = !!value;
@@ -294,8 +343,9 @@ interface Window {
         });
     }
     window.directives = {
+        baseReference: window,
         refreshRate: 100,
-        register: () => registerDirectives(document.body),
-        unregister: () => unregisterDirectives(document.body)
+        register: registerDirectives,
+        unregister: unregisterDirectives
     };
 })();
