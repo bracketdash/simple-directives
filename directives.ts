@@ -140,6 +140,9 @@ interface Window {
                         bindObj.refArgs = attrParts;
                     }
                 }
+                if (directiveName === "for") {
+                    bindObj.originalHTML = el.innerHTML;
+                }
                 if (sdForContext) {
                     if (!bindObj.itemNames) {
                         bindObj.itemNames = [];
@@ -289,7 +292,7 @@ interface Window {
                     return;
                 }
                 if (directiveName === "for") {
-                    value = bindObj.innerHTML.repeat(
+                    value = bindObj.originalHTML.repeat(
                         Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length
                     );
                 }

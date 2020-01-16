@@ -23,37 +23,36 @@ Add arguments to a function reference:
     <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
 
 */
-(function () {
+(function() {
     var binds = {
         attr: [],
-        "class": [],
-        "for": [],
+        class: [],
+        for: [],
         html: [],
-        "if": [],
+        if: [],
         on: []
     };
-    var bracketsLoop = function (loopRef) {
-        loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
+    var bracketsLoop = function(loopRef) {
+        loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
             return "." + getRef(capture);
         });
         if (/\[[^\[\]]*\]/.test(loopRef)) {
             return bracketsLoop(loopRef);
-        }
-        else {
+        } else {
             return loopRef;
         }
     };
-    var getInitialRef = function (data, jrProp) {
+    var getInitialRef = function(data, jrProp) {
         var baseRef = window.directives.baseReference;
         if (data) {
             baseRef = Object.assign({}, baseRef);
-            Object.keys(data).forEach(function (key) {
+            Object.keys(data).forEach(function(key) {
                 baseRef[key] = data[key];
             });
         }
         return baseRef[jrProp];
     };
-    var getRef = function (refStr, data) {
+    var getRef = function(refStr, data) {
         var hasBrackets = refStr.indexOf("[") !== -1;
         var hasDots = refStr.indexOf(".") !== -1;
         var reference;
@@ -64,8 +63,7 @@ Add arguments to a function reference:
         }
         if (!hasBrackets && !hasDots) {
             reference = getInitialRef(data, refStr);
-        }
-        else {
+        } else {
             if (hasBrackets) {
                 refStr = bracketsLoop(refStr);
                 if (!hasDots) {
@@ -73,14 +71,12 @@ Add arguments to a function reference:
                 }
             }
             if (hasDots) {
-                refStr.split(".").forEach(function (refPart, index) {
+                refStr.split(".").forEach(function(refPart, index) {
                     if (!index) {
                         reference = getInitialRef(data, refPart);
-                    }
-                    else if (typeof reference === "object" && reference[refPart]) {
+                    } else if (typeof reference === "object" && reference[refPart]) {
                         reference = reference[refPart];
-                    }
-                    else {
+                    } else {
                         reference = "";
                     }
                 });
@@ -90,29 +86,28 @@ Add arguments to a function reference:
     };
     var propMap = {
         attr: "attributeName",
-        "class": "className",
-        "for": "itemName",
+        class: "className",
+        for: "itemName",
         on: "eventName"
     };
-    var registerDirectives = function (el, sdForContext, sdForIndex) {
+    var registerDirectives = function(el, sdForContext, sdForIndex) {
         var isFalsyIf = false;
         var isLoop = false;
         if (!elCount) {
             elCount = 1;
         }
         unregisterDirectives(el);
-        ["if", "for", "html", "attr", "class", "on"].some(function (directiveName) {
+        ["if", "for", "html", "attr", "class", "on"].some(function(directiveName) {
             if (!el.hasAttribute("sd-" + directiveName)) {
                 return false;
             }
             var toBind;
             if (["attr"].indexOf(directiveName) !== 1 && el.getAttribute("sd-attr").indexOf(";") !== -1) {
                 toBind = el.getAttribute("sd-" + directiveName).split(";");
-            }
-            else {
+            } else {
                 toBind = [el.getAttribute("sd-" + directiveName)];
             }
-            toBind.forEach(function (attrWhole) {
+            toBind.forEach(function(attrWhole) {
                 var bindObj = { element: el };
                 var attrParts = attrWhole.split(":");
                 if (["if", "html"].indexOf(directiveName) !== -1) {
@@ -120,13 +115,15 @@ Add arguments to a function reference:
                     if (attrParts.length) {
                         bindObj.refArgs = attrParts;
                     }
-                }
-                else {
+                } else {
                     bindObj[propMap[directiveName]] = attrParts.shift();
                     bindObj.reference = attrParts.shift();
                     if (attrParts.length) {
                         bindObj.refArgs = attrParts;
                     }
+                }
+                if (directiveName === "for") {
+                    bindObj.originalHTML = el.innerHTML;
                 }
                 if (sdForContext) {
                     if (!bindObj.itemNames) {
@@ -141,8 +138,7 @@ Add arguments to a function reference:
                             item: sdForContext.value[sdForIndex],
                             value: sdForContext.value[sdForIndex]
                         };
-                    }
-                    else {
+                    } else {
                         var key = Object.keys(sdForContext.value)[sdForIndex];
                         bindObj[sdForContext.itemName] = {
                             collection: sdForContext.value,
@@ -154,7 +150,7 @@ Add arguments to a function reference:
                     }
                 }
                 if (directiveName === "on") {
-                    bindObj.listener = function (event) {
+                    bindObj.listener = function(event) {
                         var getRefData = {};
                         var callObject = {
                             element: el,
@@ -169,17 +165,15 @@ Add arguments to a function reference:
                             };
                             callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
                             getRef(bindObj.reference, getRefData).apply(callObject, bindObj.refArgs);
-                        }
-                        else {
+                        } else {
                             getRef(bindObj.reference).apply(callObject, bindObj.refArgs);
                         }
                     };
                     if (bindObj.eventName.indexOf(",") !== -1) {
-                        bindObj.eventName.split(",").forEach(function (singleEventName) {
+                        bindObj.eventName.split(",").forEach(function(singleEventName) {
                             bindObj.element.addEventListener(singleEventName, bindObj.listener);
                         });
-                    }
-                    else {
+                    } else {
                         bindObj.element.addEventListener(bindObj.eventName, bindObj.listener);
                     }
                 }
@@ -194,20 +188,17 @@ Add arguments to a function reference:
                             value: bindObj[sdForContext.itemName].value
                         };
                         bindObj.value = getRef(bindObj.reference, getRefData);
-                    }
-                    else {
+                    } else {
                         bindObj.value = getRef(bindObj.reference);
                     }
                     if (!bindObj.value) {
                         el.style.display = "none";
                         isFalsyIf = true;
                         return true;
-                    }
-                    else {
+                    } else {
                         el.style.display = null;
                     }
-                }
-                else if (directiveName === "for") {
+                } else if (directiveName === "for") {
                     isLoop = true;
                 }
             });
@@ -217,7 +208,7 @@ Add arguments to a function reference:
         }
         if (!isLoop) {
             elCount += el.children.length;
-            Array.from(el.children).forEach(function (child) {
+            Array.from(el.children).forEach(function(child) {
                 registerDirectives(child);
             });
         }
@@ -226,13 +217,13 @@ Add arguments to a function reference:
             runBinds();
         }
     };
-    var runBinds = function () {
+    var runBinds = function() {
         var indexToRemove;
         if (!runBindsRunning) {
             runBindsRunning = true;
         }
-        ["if", "for", "attr", "class", "html"].forEach(function (directiveName) {
-            binds[directiveName].forEach(function (bindObj, bindIndex) {
+        ["if", "for", "attr", "class", "html"].forEach(function(directiveName) {
+            binds[directiveName].forEach(function(bindObj, bindIndex) {
                 if (!bindObj.element.parentElement) {
                     binds[directiveName][bindIndex] = false;
                     return;
@@ -257,7 +248,7 @@ Add arguments to a function reference:
                 }
                 if (bindObj.itemNames) {
                     var getRefData_1 = {};
-                    bindObj.itemNames.forEach(function (itemName) {
+                    bindObj.itemNames.forEach(function(itemName) {
                         getRefData_1[itemName] = {
                             key: bindObj[itemName].key,
                             index: bindObj[itemName].index,
@@ -270,8 +261,7 @@ Add arguments to a function reference:
                     if (typeof value === "function") {
                         value = value.apply(callObject, bindObj.refArgs);
                     }
-                }
-                else {
+                } else {
                     value = getRef(bindObj.reference);
                     if (typeof value === "function") {
                         value = value.apply(callObject, bindObj.refArgs);
@@ -284,7 +274,9 @@ Add arguments to a function reference:
                     return;
                 }
                 if (directiveName === "for") {
-                    value = bindObj.innerHTML.repeat(Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length);
+                    value = bindObj.originalHTML.repeat(
+                        Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length
+                    );
                 }
                 bindObj.value = value;
                 switch (directiveName) {
@@ -292,68 +284,60 @@ Add arguments to a function reference:
                         if (value) {
                             bindObj.element.style.display = null;
                             registerDirectives(bindObj.element);
-                        }
-                        else {
+                        } else {
                             bindObj.element.style.display = "none";
                             unregisterDirectives(bindObj.element, "if");
                         }
                         break;
                     case "for":
                     case "html":
-                        Array.from(bindObj.element.children).forEach(function (child) {
+                        Array.from(bindObj.element.children).forEach(function(child) {
                             unregisterDirectives(child);
                         });
                         bindObj.element.innerHTML = value;
-                        Array.from(bindObj.element.children).forEach(function (child, index) {
+                        Array.from(bindObj.element.children).forEach(function(child, index) {
                             if (directiveName === "for") {
                                 registerDirectives(child, bindObj, index);
-                            }
-                            else {
+                            } else {
                                 registerDirectives(child);
                             }
                         });
                         break;
                     case "attr":
                         if (bindObj.attributeName.indexOf(",") !== -1) {
-                            bindObj.attributeName.split(",").forEach(function (singleAttributeName) {
+                            bindObj.attributeName.split(",").forEach(function(singleAttributeName) {
                                 if (typeof value === "undefined") {
                                     if (bindObj.element.hasAttribute(singleAttributeName)) {
                                         bindObj.element.removeAttribute(singleAttributeName);
                                     }
-                                }
-                                else {
+                                } else {
                                     bindObj.element.setAttribute(singleAttributeName, value);
                                 }
                             });
-                        }
-                        else if (typeof value === "undefined") {
+                        } else if (typeof value === "undefined") {
                             if (bindObj.element.hasAttribute(bindObj.attributeName)) {
                                 bindObj.element.removeAttribute(bindObj.attributeName);
                             }
-                        }
-                        else {
+                        } else {
                             bindObj.element.setAttribute(bindObj.attributeName, value);
                         }
                         break;
                     case "class":
                         if (bindObj.className.indexOf(",") !== -1) {
-                            bindObj.className.split(",").forEach(function (singleClassName) {
+                            bindObj.className.split(",").forEach(function(singleClassName) {
                                 if (!value) {
                                     if (bindObj.element.classList.contains(singleClassName)) {
                                         bindObj.element.classList.remove(singleClassName);
                                     }
-                                }
-                                else if (!bindObj.element.classList.contains(singleClassName)) {
+                                } else if (!bindObj.element.classList.contains(singleClassName)) {
                                     bindObj.element.classList.add(singleClassName);
                                 }
                             });
-                        }
-                        else if (!value) {
+                        } else if (!value) {
                             if (bindObj.element.classList.contains(bindObj.className)) {
                                 bindObj.element.classList.remove(bindObj.className);
                             }
-                        }
-                        else if (!bindObj.element.classList.contains(bindObj.className)) {
+                        } else if (!bindObj.element.classList.contains(bindObj.className)) {
                             bindObj.element.classList.add(bindObj.className);
                         }
                         break;
@@ -367,35 +351,32 @@ Add arguments to a function reference:
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
-    var unregisterDirectives = function (el, ignore) {
+    var unregisterDirectives = function(el, ignore) {
         var indexToRemove;
-        ["attr", "class", "for", "html", "if", "on"].forEach(function (directiveName) {
+        ["attr", "class", "for", "html", "if", "on"].forEach(function(directiveName) {
             if (binds[directiveName].length) {
                 if (el === document.body) {
                     if (directiveName === "on") {
-                        binds.on.forEach(function (bindObj) {
+                        binds.on.forEach(function(bindObj) {
                             if (bindObj.eventName.indexOf(",") !== -1) {
-                                bindObj.eventName.split(",").forEach(function (singleEventName) {
+                                bindObj.eventName.split(",").forEach(function(singleEventName) {
                                     bindObj.element.removeEventListener(singleEventName, bindObj.listener);
                                 });
-                            }
-                            else {
+                            } else {
                                 bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
                             }
                         });
                     }
                     binds[directiveName].length = 0;
-                }
-                else {
-                    binds[directiveName].map(function (bindObj) {
+                } else {
+                    binds[directiveName].map(function(bindObj) {
                         if (el.contains(bindObj.element)) {
                             if (directiveName === "on") {
                                 if (bindObj.eventName.indexOf(",") !== -1) {
-                                    bindObj.eventName.split(",").forEach(function (singleEventName) {
+                                    bindObj.eventName.split(",").forEach(function(singleEventName) {
                                         bindObj.element.removeEventListener(singleEventName, bindObj.listener);
                                     });
-                                }
-                                else {
+                                } else {
                                     bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
                                 }
                             }
@@ -421,13 +402,12 @@ Add arguments to a function reference:
         unregister: unregisterDirectives
     };
     if (document.readyState != "loading") {
-        setTimeout(function () {
+        setTimeout(function() {
             registerDirectives(document.body);
         });
-    }
-    else {
-        document.addEventListener("DOMContentLoaded", function () {
-            setTimeout(function () {
+    } else {
+        document.addEventListener("DOMContentLoaded", function() {
+            setTimeout(function() {
                 registerDirectives(document.body);
             });
         });
