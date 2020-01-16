@@ -1,6 +1,6 @@
 # A Simple Directives Library
 
-    <script src="directives.js"></script>
+    <script src="directives.min.js"></script>
 
 ## Add Event Listeners
 
