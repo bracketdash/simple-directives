@@ -5,49 +5,53 @@ https://github.com/bracketdash/simple-directives
 
 Add event listeners:
     <element sd-on="event:reference">
-    <element sd-on="event:reference:arg1:arg2:...">
     <element sd-on="event1:reference1;event2,event3:reference2;...">
-    <element sd-on="event1:reference1:arg1:arg2:...;event2,event3:reference2:;...">
 Bind contents:
     <element sd-html="reference">
-    <element sd-html="reference:arg1:arg2:...">
 Bind attributes:
     <element sd-attr="attribute:reference">
-    <element sd-attr="attribute:reference:arg1:arg2:...">
     <element sd-attr="attribute1:reference1;attribute2:reference2;...">
-    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
 Toggle classes:
     <element sd-class="class:reference">
-    <element sd-class="class:reference:arg1:arg2:...">
     <element sd-class="class1:reference1;class2,class3:!reference2;...">
-    <element sd-class="class1:reference1:arg1:arg2:...;class2,class3:!reference2;...">
 Create a bound loop:
     <element sd-for="item:reference">
-    <element sd-for="item:reference:arg1:arg2:...">
 Add a condition:
     <element sd-if="reference">
-    <element sd-if="reference:arg1:arg2:...">
-
-`reference` above can be a function, string, or number using object dot and bracket notation.
-
-window.directives:
-    baseReference = object
-    refreshRate = milliseconds
-    register(parentElement)
-    unregister(parentElement)
+Add arguments to a function reference:
+    <element sd-on="event:reference:arg">
+    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
 
 */
 (function () {
-    var elCount = 1;
-    var runBinds;
-    var runBindsRunning = false;
     var binds = {
         attr: [],
-        class: [],
-        for: [],
+        "class": [],
+        "for": [],
         html: [],
-        if: [],
+        "if": [],
         on: []
+    };
+    var bracketsLoop = function (loopRef) {
+        loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
+            return "." + getRef(capture);
+        });
+        if (/\[[^\[\]]*\]/.test(loopRef)) {
+            return bracketsLoop(loopRef);
+        }
+        else {
+            return loopRef;
+        }
+    };
+    var getInitialRef = function (data, jrProp) {
+        var baseRef = window.directives.baseReference;
+        if (data) {
+            baseRef = Object.assign({}, baseRef);
+            Object.keys(data).forEach(function (key) {
+                baseRef[key] = data[key];
+            });
+        }
+        return baseRef[jrProp];
     };
     var getRef = function (refStr, data) {
         var hasBrackets = refStr.indexOf("[") !== -1;
@@ -59,99 +63,36 @@ window.directives:
             returnOpposite = true;
         }
         if (!hasBrackets && !hasDots) {
-            var baseRef = window.directives.baseReference;
-            if (data) {
-                Object.keys(data).forEach(function (key) {
-                    baseRef[key] = data[key];
-                });
-            }
-            reference = baseRef[refStr];
+            reference = getInitialRef(data, refStr);
         }
-        if (hasBrackets) {
-            var bracketsLoop = function (loopRef) {
-                loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
-                    return "." + getRef(capture);
-                });
-                if (/\[[^\[\]]*\]/.test(loopRef)) {
-                    return bracketsLoop(loopRef);
+        else {
+            if (hasBrackets) {
+                refStr = bracketsLoop(refStr);
+                if (!hasDots) {
+                    hasDots = true;
                 }
-                else {
-                    return loopRef;
-                }
-            };
-            refStr = bracketsLoop(refStr);
-            if (!hasDots) {
-                hasDots = true;
             }
-        }
-        if (hasDots) {
-            refStr.split(".").forEach(function (refPart, index) {
-                if (!index) {
-                    var baseRef = window.directives.baseReference;
-                    if (data) {
-                        Object.keys(data).forEach(function (key) {
-                            baseRef[key] = data[key];
-                        });
+            if (hasDots) {
+                refStr.split(".").forEach(function (refPart, index) {
+                    if (!index) {
+                        reference = getInitialRef(data, refPart);
                     }
-                    reference = baseRef[refPart];
-                }
-                else if (typeof reference === "object" && reference[refPart]) {
-                    reference = reference[refPart];
-                }
-                else {
-                    reference = "";
-                }
-            });
+                    else if (typeof reference === "object" && reference[refPart]) {
+                        reference = reference[refPart];
+                    }
+                    else {
+                        reference = "";
+                    }
+                });
+            }
         }
-        if (returnOpposite) {
-            return !reference;
-        }
-        return reference;
+        return returnOpposite ? !reference : reference;
     };
-    var unregisterDirectives = function (el, ignore) {
-        var indexToRemove;
-        ["attr", "class", "for", "html", "if", "on"].forEach(function (directiveName) {
-            if (binds[directiveName].length) {
-                if (el === document.body) {
-                    if (directiveName === "on") {
-                        binds.on.forEach(function (bindObj) {
-                            if (bindObj.eventName.indexOf(",") !== -1) {
-                                bindObj.eventName.split(",").forEach(function (singleEventName) {
-                                    bindObj.element.removeEventListener(singleEventName, bindObj.listener);
-                                });
-                            }
-                            else {
-                                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
-                            }
-                        });
-                    }
-                    binds[directiveName].length = 0;
-                }
-                else {
-                    binds[directiveName].map(function (bindObj) {
-                        if (el.contains(bindObj.element)) {
-                            if (directiveName === "on") {
-                                if (bindObj.eventName.indexOf(",") !== -1) {
-                                    bindObj.eventName.split(",").forEach(function (singleEventName) {
-                                        bindObj.element.removeEventListener(singleEventName, bindObj.listener);
-                                    });
-                                }
-                                else {
-                                    bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
-                                }
-                            }
-                            return false;
-                        }
-                        return bindObj;
-                    });
-                    if (binds[directiveName].indexOf(false) !== -1) {
-                        while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
-                            binds[directiveName].splice(indexToRemove, 1);
-                        }
-                    }
-                }
-            }
-        });
+    var propMap = {
+        attr: "attributeName",
+        "class": "className",
+        "for": "itemName",
+        on: "eventName"
     };
     var registerDirectives = function (el, sdForContext, sdForIndex) {
         var isFalsyIf = false;
@@ -175,29 +116,16 @@ window.directives:
                 var bindObj = { element: el };
                 var attrParts = attrWhole.split(":");
                 if (["if", "html"].indexOf(directiveName) !== -1) {
-                    bindObj.reference = attrParts[0];
-                    if (attrParts.length > 1) {
-                        bindObj.refArgs = attrParts.slice(1);
+                    bindObj.reference = attrParts.shift();
+                    if (attrParts.length) {
+                        bindObj.refArgs = attrParts;
                     }
                 }
                 else {
-                    switch (directiveName) {
-                        case "attr":
-                            bindObj.attributeName = attrParts[0];
-                            break;
-                        case "class":
-                            bindObj.className = attrParts[0];
-                            break;
-                        case "for":
-                            bindObj.itemName = attrParts[0];
-                            break;
-                        case "on":
-                            bindObj.eventName = attrParts[0];
-                            break;
-                    }
-                    bindObj.reference = attrParts[1];
-                    if (attrParts.length > 2) {
-                        bindObj.refArgs = attrParts.slice(2);
+                    bindObj[propMap[directiveName]] = attrParts.shift();
+                    bindObj.reference = attrParts.shift();
+                    if (attrParts.length) {
+                        bindObj.refArgs = attrParts;
                     }
                 }
                 if (sdForContext) {
@@ -298,9 +226,11 @@ window.directives:
             runBinds();
         }
     };
-    runBinds = function () {
+    var runBinds = function () {
         var indexToRemove;
-        runBindsRunning = true;
+        if (!runBindsRunning) {
+            runBindsRunning = true;
+        }
         ["if", "for", "attr", "class", "html"].forEach(function (directiveName) {
             binds[directiveName].forEach(function (bindObj, bindIndex) {
                 if (!bindObj.element.parentElement) {
@@ -326,17 +256,17 @@ window.directives:
                         break;
                 }
                 if (!!bindObj.itemNames) {
-                    var getRefData = {};
+                    var getRefData_1 = {};
                     bindObj.itemNames.forEach(function (itemName) {
-                        getRefData[itemName] = {
+                        getRefData_1[itemName] = {
                             key: bindObj[itemName].key,
                             index: bindObj[itemName].index,
                             item: bindObj[itemName].item,
                             value: bindObj[itemName].value
                         };
-                        callObject[itemName] = getRefData[itemName];
+                        callObject[itemName] = getRefData_1[itemName];
                     });
-                    value = getRef(bindObj.reference, getRefData);
+                    value = getRef(bindObj.reference, getRefData_1);
                     if (typeof value === "function") {
                         value = value.apply(callObject, bindObj.refArgs);
                     }
@@ -437,6 +367,53 @@ window.directives:
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
+    var unregisterDirectives = function (el, ignore) {
+        var indexToRemove;
+        ["attr", "class", "for", "html", "if", "on"].forEach(function (directiveName) {
+            if (binds[directiveName].length) {
+                if (el === document.body) {
+                    if (directiveName === "on") {
+                        binds.on.forEach(function (bindObj) {
+                            if (bindObj.eventName.indexOf(",") !== -1) {
+                                bindObj.eventName.split(",").forEach(function (singleEventName) {
+                                    bindObj.element.removeEventListener(singleEventName, bindObj.listener);
+                                });
+                            }
+                            else {
+                                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                            }
+                        });
+                    }
+                    binds[directiveName].length = 0;
+                }
+                else {
+                    binds[directiveName].map(function (bindObj) {
+                        if (el.contains(bindObj.element)) {
+                            if (directiveName === "on") {
+                                if (bindObj.eventName.indexOf(",") !== -1) {
+                                    bindObj.eventName.split(",").forEach(function (singleEventName) {
+                                        bindObj.element.removeEventListener(singleEventName, bindObj.listener);
+                                    });
+                                }
+                                else {
+                                    bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                                }
+                            }
+                            return false;
+                        }
+                        return bindObj;
+                    });
+                    if (binds[directiveName].indexOf(false) !== -1) {
+                        while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
+                            binds[directiveName].splice(indexToRemove, 1);
+                        }
+                    }
+                }
+            }
+        });
+    };
+    var elCount = 1;
+    var runBindsRunning = false;
     window.directives = {
         baseReference: window,
         refreshRate: 100,

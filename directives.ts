@@ -5,36 +5,22 @@ https://github.com/bracketdash/simple-directives
 
 Add event listeners:
     <element sd-on="event:reference">
-    <element sd-on="event:reference:arg1:arg2:...">
     <element sd-on="event1:reference1;event2,event3:reference2;...">
-    <element sd-on="event1:reference1:arg1:arg2:...;event2,event3:reference2:;...">
 Bind contents:
     <element sd-html="reference">
-    <element sd-html="reference:arg1:arg2:...">
 Bind attributes:
     <element sd-attr="attribute:reference">
-    <element sd-attr="attribute:reference:arg1:arg2:...">
     <element sd-attr="attribute1:reference1;attribute2:reference2;...">
-    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
 Toggle classes:
     <element sd-class="class:reference">
-    <element sd-class="class:reference:arg1:arg2:...">
     <element sd-class="class1:reference1;class2,class3:!reference2;...">
-    <element sd-class="class1:reference1:arg1:arg2:...;class2,class3:!reference2;...">
 Create a bound loop:
     <element sd-for="item:reference">
-    <element sd-for="item:reference:arg1:arg2:...">
 Add a condition:
     <element sd-if="reference">
-    <element sd-if="reference:arg1:arg2:...">
-
-`reference` above can be a function, string, or number using object dot and bracket notation.
-
-window.directives:
-    baseReference = object
-    refreshRate = milliseconds
-    register(parentElement)
-    unregister(parentElement)
+Add arguments to a function reference:
+    <element sd-on="event:reference:arg">
+    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
 
 */
 interface ArrayConstructor {
@@ -77,7 +63,7 @@ interface Window {
     const getInitialRef = function(data, jrProp) {
         let baseRef = window.directives.baseReference;
         if (data) {
-            baseRef = Object.assign({}, baseRef);
+            baseRef = (<any>Object).assign({}, baseRef);
             Object.keys(data).forEach(function(key) {
                 baseRef[key] = data[key];
             });
