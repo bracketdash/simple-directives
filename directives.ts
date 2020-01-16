@@ -74,7 +74,7 @@ interface Window {
             refStr = refStr.substring(1);
             returnOpposite = true;
         }
-        if (/[^a-z0-9.[\]:;,]/i.test(refStr)) {
+        if (/[^a-z0-9.[\]:;,$_]/i.test(refStr)) {
             return "";
         }
         if (!hasBrackets && !hasDots) {
