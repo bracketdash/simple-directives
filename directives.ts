@@ -142,11 +142,23 @@ interface Window {
                     }
                     bindObj.itemNames.push(sdForContext.itemName);
                     if (Array.isArray(sdForContext.value)) {
-                        bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
+                        if (typeof sdForContext.value[sdForIndex] === "object") {
+                            bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
+                        } else {
+                            bindObj[sdForContext.itemName] = {
+                                value: sdForContext.value[sdForIndex]
+                            };
+                        }
                         bindObj[sdForContext.itemName].$key = sdForIndex;
                     } else {
                         let key = Object.keys(sdForContext.value)[sdForIndex];
-                        bindObj[sdForContext.itemName] = sdForContext.value[key];
+                        if (typeof sdForContext.value[key] === "object") {
+                            bindObj[sdForContext.itemName] = sdForContext.value[key];
+                        } else {
+                            bindObj[sdForContext.itemName] = {
+                                value: sdForContext.value[key]
+                            };
+                        }
                         bindObj[sdForContext.itemName].$key = key;
                     }
                     bindObj[sdForContext.itemName].$collection = sdForContext.value;
