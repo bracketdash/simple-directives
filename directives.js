@@ -255,7 +255,7 @@ Add arguments to a function reference:
                         callObject.eventName = bindObj.eventName;
                         break;
                 }
-                if (!!bindObj.itemNames) {
+                if (bindObj.itemNames) {
                     var getRefData_1 = {};
                     bindObj.itemNames.forEach(function (itemName) {
                         getRefData_1[itemName] = {

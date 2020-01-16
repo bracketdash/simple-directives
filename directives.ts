@@ -261,7 +261,7 @@ interface Window {
                         callObject.eventName = bindObj.eventName;
                         break;
                 }
-                if (!!bindObj.itemNames) {
+                if (bindObj.itemNames) {
                     let getRefData = {};
                     bindObj.itemNames.forEach(function(itemName) {
                         getRefData[itemName] = {
