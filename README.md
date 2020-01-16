@@ -1,10 +1,6 @@
 # A Simple Directives Library
 
-Place in `<head>` with `defer` or at the bottom of `<body>`:
-
     <script src="directives.js"></script>
-
-`reference` below can be a reference to a function, string, or number using object dot and bracket notation.
 
 ## Add Event Listeners
 

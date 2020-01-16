@@ -56,9 +56,6 @@ interface Window {
     directives: Directives;
 }
 (function() {
-    let elCount = 1;
-    let runBinds: Function;
-    let runBindsRunning = false;
     const binds = {
         attr: [],
         class: [],
@@ -66,6 +63,26 @@ interface Window {
         html: [],
         if: [],
         on: []
+    };
+    const bracketsLoop = function(loopRef) {
+        loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
+            return "." + getRef(capture);
+        });
+        if (/\[[^\[\]]*\]/.test(loopRef)) {
+            return bracketsLoop(loopRef);
+        } else {
+            return loopRef;
+        }
+    };
+    const getInitialRef = function(data, jrProp) {
+        let baseRef = window.directives.baseReference;
+        if (data) {
+            baseRef = Object.assign({}, baseRef);
+            Object.keys(data).forEach(function(key) {
+                baseRef[key] = data[key];
+            });
+        }
+        return baseRef[jrProp];
     };
     const getRef = function(refStr: string, data?: Object) {
         let hasBrackets = refStr.indexOf("[") !== -1;
@@ -77,93 +94,33 @@ interface Window {
             returnOpposite = true;
         }
         if (!hasBrackets && !hasDots) {
-            let baseRef = window.directives.baseReference;
-            if (data) {
-                Object.keys(data).forEach(function(key) {
-                    baseRef[key] = data[key];
-                });
-            }
-            reference = baseRef[refStr];
-        }
-        if (hasBrackets) {
-            let bracketsLoop = function(loopRef) {
-                loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
-                    return "." + getRef(capture);
-                });
-                if (/\[[^\[\]]*\]/.test(loopRef)) {
-                    return bracketsLoop(loopRef);
-                } else {
-                    return loopRef;
+            reference = getInitialRef(data, refStr);
+        } else {
+            if (hasBrackets) {
+                refStr = bracketsLoop(refStr);
+                if (!hasDots) {
+                    hasDots = true;
                 }
-            };
-            refStr = bracketsLoop(refStr);
-            if (!hasDots) {
-                hasDots = true;
             }
-        }
-        if (hasDots) {
-            refStr.split(".").forEach(function(refPart, index) {
-                if (!index) {
-                    let baseRef = window.directives.baseReference;
-                    if (data) {
-                        Object.keys(data).forEach(function(key) {
-                            baseRef[key] = data[key];
-                        });
+            if (hasDots) {
+                refStr.split(".").forEach(function(refPart, index) {
+                    if (!index) {
+                        reference = getInitialRef(data, refPart);
+                    } else if (typeof reference === "object" && reference[refPart]) {
+                        reference = reference[refPart];
+                    } else {
+                        reference = "";
                     }
-                    reference = baseRef[refPart];
-                } else if (typeof reference === "object" && reference[refPart]) {
-                    reference = reference[refPart];
-                } else {
-                    reference = "";
-                }
-            });
+                });
+            }
         }
-        if (returnOpposite) {
-            return !reference;
-        }
-        return reference;
+        return returnOpposite ? !reference : reference;
     };
-    const unregisterDirectives = function(el: HTMLElement, ignore?: string) {
-        let indexToRemove: number;
-        ["attr", "class", "for", "html", "if", "on"].forEach(function(directiveName) {
-            if (binds[directiveName].length) {
-                if (el === document.body) {
-                    if (directiveName === "on") {
-                        binds.on.forEach(function(bindObj) {
-                            if (bindObj.eventName.indexOf(",") !== -1) {
-                                bindObj.eventName.split(",").forEach(function(singleEventName) {
-                                    bindObj.element.removeEventListener(singleEventName, bindObj.listener);
-                                });
-                            } else {
-                                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
-                            }
-                        });
-                    }
-                    binds[directiveName].length = 0;
-                } else {
-                    binds[directiveName].map(function(bindObj) {
-                        if (el.contains(bindObj.element)) {
-                            if (directiveName === "on") {
-                                if (bindObj.eventName.indexOf(",") !== -1) {
-                                    bindObj.eventName.split(",").forEach(function(singleEventName) {
-                                        bindObj.element.removeEventListener(singleEventName, bindObj.listener);
-                                    });
-                                } else {
-                                    bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
-                                }
-                            }
-                            return false;
-                        }
-                        return bindObj;
-                    });
-                    if (binds[directiveName].indexOf(false) !== -1) {
-                        while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
-                            binds[directiveName].splice(indexToRemove, 1);
-                        }
-                    }
-                }
-            }
-        });
+    const propMap = {
+        attr: "attributeName",
+        class: "className",
+        for: "itemName",
+        on: "eventName"
     };
     const registerDirectives = function(el: HTMLElement, sdForContext?: SdForContext, sdForIndex?: number) {
         let isFalsyIf = false;
@@ -186,28 +143,15 @@ interface Window {
                 let bindObj: any = { element: el };
                 let attrParts = attrWhole.split(":");
                 if (["if", "html"].indexOf(directiveName) !== -1) {
-                    bindObj.reference = attrParts[0];
-                    if (attrParts.length > 1) {
-                        bindObj.refArgs = attrParts.slice(1);
+                    bindObj.reference = attrParts.shift();
+                    if (attrParts.length) {
+                        bindObj.refArgs = attrParts;
                     }
                 } else {
-                    switch (directiveName) {
-                        case "attr":
-                            bindObj.attributeName = attrParts[0];
-                            break;
-                        case "class":
-                            bindObj.className = attrParts[0];
-                            break;
-                        case "for":
-                            bindObj.itemName = attrParts[0];
-                            break;
-                        case "on":
-                            bindObj.eventName = attrParts[0];
-                            break;
-                    }
-                    bindObj.reference = attrParts[1];
-                    if (attrParts.length > 2) {
-                        bindObj.refArgs = attrParts.slice(2);
+                    bindObj[propMap[directiveName]] = attrParts.shift();
+                    bindObj.reference = attrParts.shift();
+                    if (attrParts.length) {
+                        bindObj.refArgs = attrParts;
                     }
                 }
                 if (sdForContext) {
@@ -302,9 +246,11 @@ interface Window {
             runBinds();
         }
     };
-    runBinds = function() {
+    const runBinds = function() {
         let indexToRemove: number;
-        runBindsRunning = true;
+        if (!runBindsRunning) {
+            runBindsRunning = true;
+        }
         ["if", "for", "attr", "class", "html"].forEach(function(directiveName) {
             binds[directiveName].forEach(function(bindObj, bindIndex) {
                 if (!bindObj.element.parentElement) {
@@ -434,6 +380,50 @@ interface Window {
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
+    const unregisterDirectives = function(el: HTMLElement, ignore?: string) {
+        let indexToRemove: number;
+        ["attr", "class", "for", "html", "if", "on"].forEach(function(directiveName) {
+            if (binds[directiveName].length) {
+                if (el === document.body) {
+                    if (directiveName === "on") {
+                        binds.on.forEach(function(bindObj) {
+                            if (bindObj.eventName.indexOf(",") !== -1) {
+                                bindObj.eventName.split(",").forEach(function(singleEventName) {
+                                    bindObj.element.removeEventListener(singleEventName, bindObj.listener);
+                                });
+                            } else {
+                                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                            }
+                        });
+                    }
+                    binds[directiveName].length = 0;
+                } else {
+                    binds[directiveName].map(function(bindObj) {
+                        if (el.contains(bindObj.element)) {
+                            if (directiveName === "on") {
+                                if (bindObj.eventName.indexOf(",") !== -1) {
+                                    bindObj.eventName.split(",").forEach(function(singleEventName) {
+                                        bindObj.element.removeEventListener(singleEventName, bindObj.listener);
+                                    });
+                                } else {
+                                    bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
+                                }
+                            }
+                            return false;
+                        }
+                        return bindObj;
+                    });
+                    if (binds[directiveName].indexOf(false) !== -1) {
+                        while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
+                            binds[directiveName].splice(indexToRemove, 1);
+                        }
+                    }
+                }
+            }
+        });
+    };
+    let elCount = 1;
+    let runBindsRunning = false;
     window.directives = {
         baseReference: window,
         refreshRate: 100,
