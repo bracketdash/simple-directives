@@ -1,38 +1,34 @@
-/*
-
-A Simple Directives Library
-https://github.com/bracketdash/simple-directives
-
-Add event listeners:
-    <element sd-on="event:reference">
-    <element sd-on="event1:reference1;event2,event3:reference2;...">
-Bind contents:
-    <element sd-html="reference">
-Bind attributes:
-    <element sd-attr="attribute:reference">
-    <element sd-attr="attribute1:reference1;attribute2:reference2;...">
-Toggle classes:
-    <element sd-class="class:reference">
-    <element sd-class="class1:reference1;class2,class3:!reference2;...">
-Create a bound loop:
-    <element sd-for="item:reference">
-Add a condition:
-    <element sd-if="reference">
-Add arguments to a function reference:
-    <element sd-on="event:reference:arg">
-    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
-
-*/
+// A Simple Directives Library
+// https://github.com/bracketdash/simple-directives/blob/master/README.md
 (function () {
     var binds = {
         attr: [],
-        "class": [],
-        "for": [],
+        class: [],
+        for: [],
         html: [],
-        "if": [],
+        if: [],
         on: []
     };
-    var bracketsLoop = function (loopRef) {
+    var propMap = {
+        attr: "attributeName",
+        class: "className",
+        for: "itemName",
+        on: "eventName"
+    };
+    var elCount = 1;
+    var runBindsRunning = false;
+    /* * * * * * *
+     * FUNCTIONS *
+     * * * * * * */
+    // these lets are a workaround for a flow analysis bug in the TypeScript compiler (would normally be consts)
+    var bracketsLoop;
+    var getInitialRef;
+    var getRef;
+    var registerDirectives;
+    var runBinds;
+    var unregisterDirectives;
+    // bracketsLoop: used within getRef to expand bracket groups in reference strings
+    bracketsLoop = function (loopRef) {
         loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
             return "." + getRef(capture);
         });
@@ -43,14 +39,16 @@ Add arguments to a function reference:
             return loopRef;
         }
     };
-    var getInitialRef = function (data, jrProp) {
+    // getInitialRef: used within getRef to get the initial reference object and add any scope data
+    getInitialRef = function (data, jrProp) {
         var baseRef = window.directives.baseReference;
         if (data) {
             baseRef = Object.assign(data, baseRef);
         }
         return baseRef[jrProp];
     };
-    var getRef = function (refStr, data) {
+    // getRef: converts a reference string into an actual reference
+    getRef = function (refStr, data) {
         var hasBrackets = refStr.indexOf("[") !== -1;
         var hasDots = refStr.indexOf(".") !== -1;
         var reference;
@@ -85,13 +83,8 @@ Add arguments to a function reference:
         }
         return returnOpposite ? !reference : reference;
     };
-    var propMap = {
-        attr: "attributeName",
-        "class": "className",
-        "for": "itemName",
-        on: "eventName"
-    };
-    var registerDirectives = function (el, sdForContext, sdForIndex) {
+    // registerDirectives: initializes directives on `el` and all children
+    registerDirectives = function (el, sdForContext, sdForIndex) {
         var isFalsyIf = false;
         var isLoop = false;
         if (!elCount) {
@@ -154,26 +147,80 @@ Add arguments to a function reference:
                     }
                 }
                 if (directiveName === "on") {
-                    bindObj.listener = function (event) {
-                        var getRefData = {};
-                        var callObject = {
-                            element: el,
-                            event: event
-                        };
-                        if (sdForContext) {
-                            getRefData[sdForContext.itemName] = {
-                                key: bindObj[sdForContext.itemName].key,
-                                index: bindObj[sdForContext.itemName].index,
-                                item: bindObj[sdForContext.itemName].item,
-                                value: bindObj[sdForContext.itemName].value
+                    if (bindObj.reference === "$update") {
+                        var attrValIndex;
+                        var refToUpdate;
+                        if (bindObj.element.hasAttribute("sd-attr")) {
+                            if (bindObj.element.tagName === "input" &&
+                                ["checkbox", "radio"].indexOf(bindObj.element.getAttribute("type")) !== -1) {
+                                refToUpdate = bindObj.element.getAttribute("sd-attr");
+                                attrValIndex = refToUpdate.indexOf("checked");
+                                if (attrValIndex !== -1) {
+                                    refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
+                                    attrValIndex = refToUpdate.indexOf(";");
+                                    if (attrValIndex !== -1) {
+                                        refToUpdate = refToUpdate.substring(0, attrValIndex);
+                                    }
+                                    refToUpdate = getRef(refToUpdate);
+                                    if (typeof refToUpdate !== "function") {
+                                        bindObj.listener = function () {
+                                            refToUpdate = bindObj.element.checked;
+                                        };
+                                    }
+                                }
+                            }
+                            else {
+                                refToUpdate = bindObj.element.getAttribute("sd-attr");
+                                attrValIndex = refToUpdate.indexOf("value");
+                                if (attrValIndex !== -1) {
+                                    refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
+                                    attrValIndex = refToUpdate.indexOf(";");
+                                    if (attrValIndex !== -1) {
+                                        refToUpdate = refToUpdate.substring(0, attrValIndex);
+                                    }
+                                    refToUpdate = getRef(refToUpdate);
+                                    if (typeof refToUpdate !== "function") {
+                                        bindObj.listener = function () {
+                                            refToUpdate = bindObj.element.value;
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                        else if (bindObj.element.hasAttribute("sd-html") && bindObj.element.isContentEditable) {
+                            refToUpdate = getRef(bindObj.element.getAttribute("sd-html"));
+                            if (typeof refToUpdate !== "function") {
+                                bindObj.listener = function () {
+                                    refToUpdate = bindObj.element.innerHTML;
+                                };
+                            }
+                        }
+                        if (!bindObj.listener) {
+                            return;
+                        }
+                    }
+                    else {
+                        bindObj.listener = function (event) {
+                            var getRefData = {};
+                            var callObject = {
+                                element: el,
+                                event: event
                             };
-                            callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                            getRef(bindObj.reference, getRefData).apply(callObject, bindObj.refArgs);
-                        }
-                        else {
-                            getRef(bindObj.reference).apply(callObject, bindObj.refArgs);
-                        }
-                    };
+                            if (sdForContext) {
+                                getRefData[sdForContext.itemName] = {
+                                    key: bindObj[sdForContext.itemName].key,
+                                    index: bindObj[sdForContext.itemName].index,
+                                    item: bindObj[sdForContext.itemName].item,
+                                    value: bindObj[sdForContext.itemName].value
+                                };
+                                callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
+                                getRef(bindObj.reference, getRefData).apply(callObject, bindObj.refArgs);
+                            }
+                            else {
+                                getRef(bindObj.reference).apply(callObject, bindObj.refArgs);
+                            }
+                        };
+                    }
                     if (bindObj.eventName.indexOf(",") !== -1) {
                         bindObj.eventName.split(",").forEach(function (singleEventName) {
                             bindObj.element.addEventListener(singleEventName, bindObj.listener);
@@ -226,7 +273,8 @@ Add arguments to a function reference:
             runBinds();
         }
     };
-    var runBinds = function () {
+    // runBinds: loops every `directives.refreshRate` milliseconds to keep binds updated
+    runBinds = function () {
         var indexToRemove;
         if (!runBindsRunning) {
             runBindsRunning = true;
@@ -256,17 +304,17 @@ Add arguments to a function reference:
                         break;
                 }
                 if (bindObj.itemNames) {
-                    var getRefData_1 = {};
+                    var getRefData = {};
                     bindObj.itemNames.forEach(function (itemName) {
-                        getRefData_1[itemName] = {
+                        getRefData[itemName] = {
                             key: bindObj[itemName].key,
                             index: bindObj[itemName].index,
                             item: bindObj[itemName].item,
                             value: bindObj[itemName].value
                         };
-                        callObject[itemName] = getRefData_1[itemName];
+                        callObject[itemName] = getRefData[itemName];
                     });
-                    value = getRef(bindObj.reference, getRefData_1);
+                    value = getRef(bindObj.reference, getRefData);
                     if (typeof value === "function") {
                         value = value.apply(callObject, bindObj.refArgs);
                     }
@@ -367,7 +415,8 @@ Add arguments to a function reference:
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
-    var unregisterDirectives = function (el, ignore) {
+    // unregisterDirectives: destroys binds and listeners for directives on `el` and all children
+    unregisterDirectives = function (el, ignore) {
         var indexToRemove;
         ["attr", "class", "for", "html", "if", "on"].forEach(function (directiveName) {
             if (binds[directiveName].length) {
@@ -412,8 +461,9 @@ Add arguments to a function reference:
             }
         });
     };
-    var elCount = 1;
-    var runBindsRunning = false;
+    /* * * * * * * *
+     * INITIALIZE  *
+     * * * * * * * */
     window.directives = {
         baseReference: window,
         refreshRate: 100,

@@ -38,6 +38,16 @@ Available on `this` within the function:
 
 If `reference` evaluates to `undefined`, the attribute will be removed from the element if it exists.
 
+## Two-Way Binding with `$update`
+
+    <input type="text" sd-attr="value:reference" sd-on="keyup:$update">
+    <input type="checkbox" sd-attr="checked:reference" sd-on="change:$update">
+    <textarea sd-attr="value:reference" sd-on="keydown:$update">
+    <select sd-attr="value:reference" sd-on="change:$update">
+    <div contenteditable="true" sd-html="reference" sd-on="keyup:$update">
+
+> If the appropriate binding isn't initially present, the $update will not be bound until you call `directives.register()`
+
 ## Toggle Classes
 
     <element sd-class="class:reference" />
@@ -82,8 +92,6 @@ Available on `this` within the function:
 If `reference` evaluates falsy, the element will be hidden and any bindings within will be paused.
 
 ## Add Arguments To A Function Reference
-
-Examples:
 
     <element sd-on="event:reference:arg">
     <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
