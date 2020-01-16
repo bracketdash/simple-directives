@@ -142,23 +142,15 @@ interface Window {
                     }
                     bindObj.itemNames.push(sdForContext.itemName);
                     if (Array.isArray(sdForContext.value)) {
-                        bindObj[sdForContext.itemName] = {
-                            collection: sdForContext.value,
-                            key: sdForIndex,
-                            index: sdForIndex,
-                            item: sdForContext.value[sdForIndex],
-                            value: sdForContext.value[sdForIndex]
-                        };
+                        bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
+                        bindObj[sdForContext.itemName].$key = sdForIndex;
                     } else {
                         let key = Object.keys(sdForContext.value)[sdForIndex];
-                        bindObj[sdForContext.itemName] = {
-                            collection: sdForContext.value,
-                            key: key,
-                            index: sdForIndex,
-                            item: sdForContext.value[key],
-                            value: sdForContext.value[key]
-                        };
+                        bindObj[sdForContext.itemName] = sdForContext.value[key];
+                        bindObj[sdForContext.itemName].$key = key;
                     }
+                    bindObj[sdForContext.itemName].$collection = sdForContext.value;
+                    bindObj[sdForContext.itemName].$index = sdForIndex;
                 }
                 if (directiveName === "on") {
                     if (bindObj.reference === "$update") {
@@ -220,12 +212,7 @@ interface Window {
                                 event
                             };
                             if (sdForContext) {
-                                getRefData[sdForContext.itemName] = {
-                                    key: bindObj[sdForContext.itemName].key,
-                                    index: bindObj[sdForContext.itemName].index,
-                                    item: bindObj[sdForContext.itemName].item,
-                                    value: bindObj[sdForContext.itemName].value
-                                };
+                                getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
                                 callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
                                 getRef(bindObj.reference, getRefData).apply(
                                     callObject,
@@ -251,12 +238,7 @@ interface Window {
                 if (directiveName === "if") {
                     if (sdForContext) {
                         let getRefData = {};
-                        getRefData[sdForContext.itemName] = {
-                            key: bindObj[sdForContext.itemName].key,
-                            index: bindObj[sdForContext.itemName].index,
-                            item: bindObj[sdForContext.itemName].item,
-                            value: bindObj[sdForContext.itemName].value
-                        };
+                        getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
                         bindObj.value = getRef(bindObj.reference, getRefData);
                     } else {
                         bindObj.value = getRef(bindObj.reference);
@@ -320,12 +302,7 @@ interface Window {
                 if (bindObj.itemNames) {
                     let getRefData = {};
                     bindObj.itemNames.forEach(function(itemName) {
-                        getRefData[itemName] = {
-                            key: bindObj[itemName].key,
-                            index: bindObj[itemName].index,
-                            item: bindObj[itemName].item,
-                            value: bindObj[itemName].value
-                        };
+                        getRefData[itemName] = bindObj[itemName];
                         callObject[itemName] = getRefData[itemName];
                     });
                     value = getRef(bindObj.reference, getRefData);

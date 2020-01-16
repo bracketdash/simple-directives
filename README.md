@@ -75,13 +75,13 @@ Available on `this` within the function:
 
 The contents of the element will be repeated once for each item.
 
-Available at `(itemName)` in references and on `this` in functions:
+References made within the loop will also have `this.(itemName)` available.
 
--   `collection`
--   `index`
--   `item`
--   `key`
--   `value`
+`this.(itemName)` will be populated with the item itself, as well as...
+
+-   `$collection`
+-   `$index`
+-   `$key`
 
 ## Extras
 
