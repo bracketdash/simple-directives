@@ -94,7 +94,7 @@ If the argument is a reference to a defined variable, the function will receive 
 
 If the argument is not a valid reference, it will be passed to the function as a string.
 
-If you intend to pass a string to the function, don't place quotes around the argument.
+If you intend to pass a string as the argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
 

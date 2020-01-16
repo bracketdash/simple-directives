@@ -18,7 +18,6 @@ interface SdForContext {
 interface Window {
     directives: Directives;
 }
-// TODO: support arguments as references - see recent doc updates
 (function() {
     const binds = {
         attr: [],
@@ -65,7 +64,7 @@ interface Window {
         }
         return baseRef[jrProp];
     };
-    // getRef: converts a reference string into an actual reference
+    // getRef: converts a reference string into an actual reference (return empty string if invalid reference)
     getRef = function(refStr: string, data?: Object) {
         let hasBrackets = refStr.indexOf("[") !== -1;
         let hasDots = refStr.indexOf(".") !== -1;
@@ -74,6 +73,9 @@ interface Window {
         if (refStr.indexOf("!") === 0) {
             refStr = refStr.substring(1);
             returnOpposite = true;
+        }
+        if (/[^a-z0-9.[\]:;,]/i.test(refStr)) {
+            return "";
         }
         if (!hasBrackets && !hasDots) {
             reference = getInitialRef(data, refStr);
@@ -225,9 +227,15 @@ interface Window {
                                     value: bindObj[sdForContext.itemName].value
                                 };
                                 callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                                getRef(bindObj.reference, getRefData).apply(callObject, bindObj.refArgs);
+                                getRef(bindObj.reference, getRefData).apply(
+                                    callObject,
+                                    bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
+                                );
                             } else {
-                                getRef(bindObj.reference).apply(callObject, bindObj.refArgs);
+                                getRef(bindObj.reference).apply(
+                                    callObject,
+                                    bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
+                                );
                             }
                         };
                     }
@@ -321,14 +329,14 @@ interface Window {
                         callObject[itemName] = getRefData[itemName];
                     });
                     value = getRef(bindObj.reference, getRefData);
-                    if (typeof value === "function") {
-                        value = value.apply(callObject, bindObj.refArgs);
-                    }
                 } else {
                     value = getRef(bindObj.reference);
-                    if (typeof value === "function") {
-                        value = value.apply(callObject, bindObj.refArgs);
-                    }
+                }
+                if (typeof value === "function") {
+                    value = value.apply(
+                        callObject,
+                        bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
+                    );
                 }
                 if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
                     value = !!value;
