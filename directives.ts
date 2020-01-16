@@ -63,10 +63,7 @@ interface Window {
     const getInitialRef = function(data, jrProp) {
         let baseRef = window.directives.baseReference;
         if (data) {
-            baseRef = (<any>Object).assign({}, baseRef);
-            Object.keys(data).forEach(function(key) {
-                baseRef[key] = data[key];
-            });
+            baseRef = (<any>Object).assign(data, baseRef);
         }
         return baseRef[jrProp];
     };
