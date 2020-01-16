@@ -210,19 +210,25 @@
                     }
                     else {
                         bindObj.listener = function (event) {
-                            var getRefData = {};
+                            var getRefData = false;
                             var callObject = {
                                 element: el,
                                 event: event
                             };
+                            var references;
                             if (sdForContext) {
                                 getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
                                 callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                                getRef(bindObj.reference, getRefData).apply(callObject, bindObj.refArgs.map(function (refArg) { return getRef(refArg) || refArg; }));
+                            }
+                            if (bindObj.reference.indexOf(",") !== -1) {
+                                references = bindObj.reference.split(",");
                             }
                             else {
-                                getRef(bindObj.reference).apply(callObject, bindObj.refArgs.map(function (refArg) { return getRef(refArg) || refArg; }));
+                                references = [bindObj.reference];
                             }
+                            references.forEach(function (reference) {
+                                getRef(reference, getRefData).apply(callObject, bindObj.refArgs.map(function (refArg) { return getRef(refArg) || refArg; }));
+                            });
                         };
                     }
                     if (bindObj.eventName.indexOf(",") !== -1) {

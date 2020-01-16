@@ -218,24 +218,27 @@ interface Window {
                         }
                     } else {
                         bindObj.listener = function(event) {
-                            let getRefData = {};
+                            let getRefData: any = false;
                             let callObject: any = {
                                 element: el,
                                 event
                             };
+                            let references: string[];
                             if (sdForContext) {
                                 getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
                                 callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                                getRef(bindObj.reference, getRefData).apply(
-                                    callObject,
-                                    bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
-                                );
-                            } else {
-                                getRef(bindObj.reference).apply(
-                                    callObject,
-                                    bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
-                                );
                             }
+                            if (bindObj.reference.indexOf(",") !== -1) {
+                                references = bindObj.reference.split(",");
+                            } else {
+                                references = [bindObj.reference];
+                            }
+                            references.forEach(function(reference) {
+                                getRef(reference, getRefData).apply(
+                                    callObject,
+                                    bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
+                                );
+                            });
                         };
                     }
                     if (bindObj.eventName.indexOf(",") !== -1) {

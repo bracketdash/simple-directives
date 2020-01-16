@@ -1,77 +1,71 @@
 # A Simple Directives Library
 
-    <script src="directives.min.js"></script>
+```html
+<script src="directives.min.js"></script>
+```
 
 ## Directives
 
 ### Conditionals with `sd-if`
 
-    <element sd-if="reference" />
+```html
+<element sd-if="reference" />
+```
 
-Available on `this` within the function:
-
--   `element`
+If `reference` is a function, `this.element` will be available inside.
 
 If `reference` evaluates falsy, the element will be hidden and any bindings within will be paused.
 
-### Event Listeners with `sd-on`
-
-    <element sd-on="eventName:reference" />
-    <element sd-on="event1:reference1;event2:reference2;...">
-
-Available on `this` within the function:
-
--   `element`
--   `event`
-
-`reference` here should be a function to run when the event is triggered on the element.
-
 ### Content Binds with `sd-html`
 
-    <element sd-html="reference" />
+```html
+<element sd-html="reference" />
+```
 
-Available on `this` within the function:
+If `reference` is a function, `this.element` will be available inside.
 
--   `element`
-
-`reference` here should evaluate to valid HTML with all opened tags closed.
+`reference` should evaluate to plain text or a valid HTML fragment.
 
 ### Attribute Binds with `sd-attr`
 
-    <element sd-attr="attribute:reference" />
-    <element sd-attr="attribute1:reference1;attribute2:reference2;...">
+```html
+<element sd-attr="attribute:reference" />
 
-Available on `this` within the function:
+<!-- allows for multiple attribute:reference sets -->
+<element sd-attr="attribute1:reference1;attribute2:reference2;..." />
+```
 
--   `attributeName`
--   `element`
+If `reference` is a function, `this.element` and `this.attributeName` will be available inside.
 
-`reference` here should evaluate to a valid value for the given attribute.
+`reference` should evaluate to a valid value for the given attribute.
 
 If `reference` evaluates to `undefined`, the attribute will be removed from the element if it exists.
 
 ### Class Toggles with `sd-class`
 
-    <element sd-class="class:reference" />
-    <element sd-class="class1:reference1;class2:reference2;...">
+```html
+<element sd-class="class:reference" />
 
-Available on `this` within the function:
+<!-- allows for multiple class:reference sets -->
+<element sd-class="class1:reference1;class2:reference2;..." />
 
--   `className`
--   `element`
+<!-- allows for multiple classes to one reference -->
+<element sd-class="class1,class2:reference1" />
+```
+
+If `reference` is a function, `this.element` and `this.className` will be available inside.
 
 If `reference` evaluates truthy, the given class will exist in the element's classList.
 
 ### Loops with `sd-for`
 
-    <element sd-for="item:reference" />
+```html
+<element sd-for="item:reference" />
+```
 
-Available on `this` within the function:
+If `reference` is a function, `this.element` and `this.itemName` will be available inside.
 
--   `element`
--   `itemName`
-
-`reference` here should evaluate to an array or object.
+`reference` should evaluate to an array or object.
 
 The contents of the element will be repeated once for each item.
 
@@ -83,16 +77,42 @@ If the item is an object, `this[itemName]` will be populated with the item itsel
 -   `$index`
 -   `$key`
 
-If the item is not an object, `this[itemName]` will be empty except for the properties above, plus:
+If the item is not an object, `this[itemName]` will be empty except for the properties above, plus `value`.
 
--   `value`
+### Event Listeners with `sd-on`
+
+```html
+<element sd-on="eventName:reference" />
+
+<!-- allows for multiple event:reference sets -->
+<element sd-on="event1:reference1;event2:reference2;..." />
+
+<!-- allows for multpile events for a single reference -->
+<element sd-on="event1,event2:reference1" />
+
+<!-- allows for multiple references for a single event -->
+<element sd-on="event:reference1,reference2" />
+
+<!-- example: both events to fire both functions -->
+<element sd-on="event1,event2:reference1,reference2" />
+```
+
+`reference` should be a function to run when the event is triggered on the element.
+
+`this.element` and `this.event` will be available inside the function.
 
 ## Extras
 
 ### Function Reference Arguments
 
-    <element sd-on="event:reference:arg">
-    <element sd-attr="attribute1:reference1:arg1:arg2:...;attribute2:reference2;...">
+```html
+<element sd-on="event:reference:arg" />
+
+<!-- allows for multiple arguments -->
+<element sd-on="event:reference:arg1:arg2" />
+```
+
+Argument will be ignored if the reference is not a function.
 
 If the argument is a reference to a defined variable, the function will receive the variable itself.
 
@@ -104,15 +124,24 @@ Arguments may not include the `:`, `;`, or `,` characters.
 
 ### Two-Way Binding with `$update`
 
-    <input type="text" sd-attr="value:reference" sd-on="keyup:$update">
-    <input type="checkbox" sd-attr="checked:reference" sd-on="change:$update">
-    <textarea sd-attr="value:reference" sd-on="keydown:$update">
-    <select sd-attr="value:reference" sd-on="change:$update">
-    <div contenteditable="true" sd-html="reference" sd-on="keyup:$update">
+```html
+<!-- examples -->
+<input type="text" sd-attr="value:reference" sd-on="keyup:$update" />
+<input type="checkbox" sd-attr="checked:reference" sd-on="change:$update" />
+<textarea sd-attr="value:reference" sd-on="keydown:$update"></textarea>
+<select sd-attr="value:reference" sd-on="change:$update"></select>
+<div contenteditable="true" sd-html="reference" sd-on="keyup:$update"></div>
+```
 
-### Accessible Scope
+### Available To Your Custom Scripts
 
-    directives.baseReference = object;
-    directives.refreshRate = milliseconds;
-    directives.register(parentElement);
-    directives.unregister(parentElement);
+```javascript
+directives.baseReference = object;
+directives.refreshRate = milliseconds;
+
+// refresh the node tree for `parentElement` and all children
+directives.register(parentElement);
+
+// kill simple-directives for `parentElement` and all children
+directives.unregister(parentElement);
+```
