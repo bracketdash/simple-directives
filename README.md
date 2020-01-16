@@ -38,7 +38,7 @@ Available on `this` within the function:
 
 If `reference` evaluates to `undefined`, the attribute will be removed from the element if it exists.
 
-## Two-Way Binding with `$update`
+## Two-Way Binding
 
     <input type="text" sd-attr="value:reference" sd-on="keyup:$update">
     <input type="checkbox" sd-attr="checked:reference" sd-on="change:$update">
@@ -46,7 +46,7 @@ If `reference` evaluates to `undefined`, the attribute will be removed from the 
     <select sd-attr="value:reference" sd-on="change:$update">
     <div contenteditable="true" sd-html="reference" sd-on="keyup:$update">
 
-> If the appropriate binding isn't initially present, the $update will not be bound until you call `directives.register()`
+> If the appropriate binding isn't initially present, the $update will not be bound until you call directives.register()
 
 ## Toggle Classes
 
