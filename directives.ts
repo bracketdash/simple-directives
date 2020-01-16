@@ -18,6 +18,7 @@ interface SdForContext {
 interface Window {
     directives: Directives;
 }
+// TODO: support arguments as references - see recent doc updates
 (function() {
     const binds = {
         attr: [],
