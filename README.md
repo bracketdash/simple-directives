@@ -41,6 +41,21 @@ If `reference` is a function, `this.element` and `this.attributeName` will be av
 
 If `reference` evaluates to `undefined`, the attribute will be removed from the element if it exists.
 
+### Radio Group Binds with `sd-rdo`
+
+```html
+<input type="radio" name="samename" value="value1" sd-rdo="reference" />
+<input type="radio" name="samename" value="value2" />
+```
+
+If `sd-rdo` exists on more than one radio button of the same group, only the first one will register.
+
+If `reference` is a function, `this.element` will be available inside.
+
+If `reference` evaluates to one of the radio group values, the associated radio button will be selected.
+
+If `reference` evaluates to anything else, none of the radio buttons will be selected.
+
 ### Class Toggles with `sd-class`
 
 ```html
@@ -57,7 +72,7 @@ If `reference` is a function, `this.element` and `this.className` will be availa
 
 If `reference` evaluates truthy, the given class will exist in the element's classList.
 
-### Loops with `sd-for`
+### Content Loops with `sd-for`
 
 ```html
 <element sd-for="item:reference" />
@@ -122,12 +137,13 @@ If you intend to pass a string as the argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
 
-### Two-Way Binding with `$update`
+### Two-Way Bindings with \$update
 
 ```html
 <!-- examples -->
 <input type="text" sd-attr="value:reference" sd-on="keyup:$update" />
 <input type="checkbox" sd-attr="checked:reference" sd-on="change:$update" />
+<input type="radio" name="name" value="value" sd-rdo="reference" sd-on="change:$update" />
 <textarea sd-attr="value:reference" sd-on="keydown:$update"></textarea>
 <select sd-attr="value:reference" sd-on="change:$update"></select>
 <div contenteditable="true" sd-html="reference" sd-on="keyup:$update"></div>

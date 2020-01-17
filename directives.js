@@ -7,7 +7,8 @@
         for: [],
         html: [],
         if: [],
-        on: []
+        on: [],
+        rdo: []
     };
     var propMap = {
         attr: "attributeName",
@@ -94,12 +95,26 @@
             elCount = 1;
         }
         unregisterDirectives(el);
-        ["if", "for", "html", "attr", "class", "on"].some(function (directiveName) {
+        // all directives - if and for need to happen first
+        ["if", "for", "html", "attr", "rdo", "class", "on"].some(function (directiveName) {
+            var toBind;
             if (!el.hasAttribute("sd-" + directiveName)) {
                 return false;
             }
-            var toBind;
-            if (["attr"].indexOf(directiveName) !== 1 && el.getAttribute("sd-attr").indexOf(";") !== -1) {
+            if (directiveName === "rdo") {
+                var existingRdoFound = false;
+                binds.rdo.some(function (bindObj) {
+                    if (bindObj.element === el) {
+                        existingRdoFound = true;
+                        return true;
+                    }
+                });
+                if (existingRdoFound) {
+                    return false;
+                }
+            }
+            // directives which allow multiple definition sets
+            if (["attr", "class", "on"].indexOf(directiveName) !== -1 && el.getAttribute("sd-attr").indexOf(";") !== -1) {
                 toBind = el.getAttribute("sd-" + directiveName).split(";");
             }
             else {
@@ -108,7 +123,8 @@
             toBind.forEach(function (attrWhole) {
                 var bindObj = { element: el };
                 var attrParts = attrWhole.split(":");
-                if (["if", "html"].indexOf(directiveName) !== -1) {
+                // directives which do not have a value before the reference
+                if (["if", "html", "rdo"].indexOf(directiveName) !== -1) {
                     bindObj.reference = attrParts.shift();
                     if (attrParts.length) {
                         bindObj.refArgs = attrParts;
@@ -204,8 +220,23 @@
                                 };
                             }
                         }
+                        else if (bindObj.element.hasAttribute("sd-rdo")) {
+                            refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"));
+                            if (typeof refToUpdate !== "function") {
+                                bindObj.listener = function () {
+                                    var value;
+                                    Array.from(document.getElementsByName(bindObj.element.name)).some(function (rdoEl) {
+                                        if (rdoEl.checked) {
+                                            value = rdoEl.value;
+                                            return true;
+                                        }
+                                    });
+                                    refToUpdate = bindObj.element.innerHTML;
+                                };
+                            }
+                        }
                         if (!bindObj.listener) {
-                            return;
+                            return false;
                         }
                     }
                     else {
@@ -284,7 +315,8 @@
         if (!runBindsRunning) {
             runBindsRunning = true;
         }
-        ["if", "for", "attr", "class", "html"].forEach(function (directiveName) {
+        // bind directives (i.e. everything except sd-on) - if and for need to be first
+        ["if", "for", "html", "attr", "rdo", "class"].forEach(function (directiveName) {
             binds[directiveName].forEach(function (bindObj, bindIndex) {
                 if (!bindObj.element.parentElement) {
                     binds[directiveName][bindIndex] = false;
@@ -304,9 +336,7 @@
                     case "for":
                         callObject.itemName = bindObj.itemName;
                         break;
-                    case "on":
-                        callObject.eventName = bindObj.eventName;
-                        break;
+                    default: break;
                 }
                 if (bindObj.itemNames) {
                     var getRefData = {};
@@ -322,9 +352,11 @@
                 if (typeof value === "function") {
                     value = value.apply(callObject, bindObj.refArgs.map(function (refArg) { return getRef(refArg) || refArg; }));
                 }
+                // directives that only accept booleans
                 if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
                     value = !!value;
                 }
+                // if value hasn't changed, skip the rest of this bind run
                 if (bindObj.value && bindObj.value === value) {
                     return;
                 }
@@ -379,6 +411,16 @@
                         else {
                             bindObj.element.setAttribute(bindObj.attributeName, value);
                         }
+                        break;
+                    case "rdo":
+                        Array.from(document.getElementsByName(bindObj.element.name)).forEach(function (rdoEl) {
+                            if (rdoEl.value === value) {
+                                rdoEl.checked = true;
+                            }
+                            else {
+                                rdoEl.checked = false;
+                            }
+                        });
                         break;
                     case "class":
                         if (bindObj.className.indexOf(",") !== -1) {
