@@ -60,21 +60,50 @@ interface Window {
     };
     // getInitialRef: used within getRef to get the initial reference object and add any scope data
     getInitialRef = function(data, jrProp) {
-        let baseRef = window.directives.baseReference;
-        if (data) {
-            baseRef = (<any>Object).assign(data, baseRef);
-        }
+        let baseRef = (<any>Object).assign(data, window.directives.baseReference);
         return baseRef[jrProp];
     };
     // getRef: converts a reference string into an actual reference (return empty string if invalid reference)
-    getRef = function(refStr: string, data?: Object) {
+    getRef = function(refStr: string, data?: Object, preserveReference?: boolean) {
         let hasBrackets = refStr.indexOf("[") !== -1;
         let hasDots = refStr.indexOf(".") !== -1;
+        let lastPart: string;
         let reference;
         let returnOpposite = false;
         if (refStr.indexOf("!") === 0) {
             refStr = refStr.substring(1);
             returnOpposite = true;
+        }
+        if (!data) {
+            data = {};
+        }
+        if (/[=<!>]/.test(refStr)) {
+            let comparator = refStr.match(/([=<!>]+)/)[0];
+            if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
+                let expressionParts = refStr.split(comparator);
+                let left = getRef(expressionParts[0]);
+                let right = getRef(expressionParts[1]);
+                if (typeof left === "function") {
+                    left = left.apply(data);
+                }
+                if (typeof right === "function") {
+                    right = right.apply(data);
+                }
+                let value: boolean;
+                switch (comparator) {
+                    case "==": value = left == right; break;
+                    case "===": value = left === right; break;
+                    case "!=": value = left != right; break;
+                    case "!==": value = left != right; break;
+                    case "<": value = left < right; break;
+                    case ">": value = left > right; break;
+                    case "<=": value = left <= right; break;
+                    case ">=": value = left >= right; break;
+                }
+                return value;
+            } else {
+                return "";
+            }
         }
         if (/[^a-z0-9.[\]:;,$_]/i.test(refStr)) {
             return "";
@@ -89,16 +118,26 @@ interface Window {
                 }
             }
             if (hasDots) {
-                refStr.split(".").forEach(function(refPart, index) {
+                let refParts = refStr.split(".");
+                refParts.forEach(function(refPart, index) {
                     if (!index) {
                         reference = getInitialRef(data, refPart);
                     } else if (typeof reference === "object" && reference[refPart]) {
-                        reference = reference[refPart];
+                        if (preserveReference && index === refParts.length - 1) {
+                            lastPart = refPart;
+                        } else {
+                            reference = reference[refPart];
+                        }
                     } else {
                         reference = "";
                     }
                 });
             }
+        }
+        if (preserveReference && lastPart) {
+            reference.$lastPart = lastPart;
+            reference.$returnOpposite = returnOpposite;
+            return reference;
         }
         return returnOpposite ? !reference : reference;
     };
@@ -112,6 +151,7 @@ interface Window {
         unregisterDirectives(el);
         // all directives - if and for need to happen first
         ["if", "for", "html", "attr", "rdo", "class", "on"].some(function(directiveName) {
+            const directiveValue = el.getAttribute("sd-" + directiveName).replace(/\s+/, "");
             let toBind: any[];
             if (!el.hasAttribute("sd-" + directiveName)) {
                 return false;
@@ -129,10 +169,10 @@ interface Window {
                 }
             }
             // directives which allow multiple definition sets
-            if (["attr", "class", "on"].indexOf(directiveName) !== -1 && el.getAttribute("sd-attr").indexOf(";") !== -1) {
-                toBind = el.getAttribute("sd-" + directiveName).split(";");
+            if (["attr", "class", "on"].indexOf(directiveName) !== -1 && directiveValue.indexOf(";") !== -1) {
+                toBind = directiveValue.split(";");
             } else {
-                toBind = [el.getAttribute("sd-" + directiveName)];
+                toBind = [directiveValue];
             }
             toBind.forEach(function(attrWhole) {
                 let bindObj: any = { element: el };
@@ -190,7 +230,7 @@ interface Window {
                     }
                     if (references.indexOf("$update") !== -1) {
                         let attrValIndex: number;
-                        let refToUpdate: string;
+                        let refToUpdate;
                         let indexToRemove: number;
                         while ((indexToRemove = references.indexOf("$update")) !== -1) {
                             references.splice(indexToRemove, 1);
@@ -208,10 +248,10 @@ interface Window {
                                     if (attrValIndex !== -1) {
                                         refToUpdate = refToUpdate.substring(0, attrValIndex);
                                     }
-                                    refToUpdate = getRef(refToUpdate);
-                                    if (typeof refToUpdate !== "function") {
+                                    refToUpdate = getRef(refToUpdate, false, true);
+                                    if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
                                         bindObj.updater = function() {
-                                            refToUpdate = bindObj.element.checked;
+                                            refToUpdate[refToUpdate.$lastPart] = bindObj.element.checked;
                                         };
                                     }
                                 }
@@ -224,24 +264,24 @@ interface Window {
                                     if (attrValIndex !== -1) {
                                         refToUpdate = refToUpdate.substring(0, attrValIndex);
                                     }
-                                    refToUpdate = getRef(refToUpdate);
-                                    if (typeof refToUpdate !== "function") {
+                                    refToUpdate = getRef(refToUpdate, false, true);
+                                    if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
                                         bindObj.updater = function() {
-                                            refToUpdate = bindObj.element.value;
+                                            refToUpdate[refToUpdate.$lastPart] = bindObj.element.value;
                                         };
                                     }
                                 }
                             }
                         } else if (bindObj.element.hasAttribute("sd-html") && bindObj.element.isContentEditable) {
-                            refToUpdate = getRef(bindObj.element.getAttribute("sd-html"));
-                            if (typeof refToUpdate !== "function") {
+                            refToUpdate = getRef(bindObj.element.getAttribute("sd-html"), false, true);
+                            if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
                                 bindObj.updater = function() {
-                                    refToUpdate = bindObj.element.innerHTML;
+                                    refToUpdate[refToUpdate.$lastPart] = bindObj.element.innerHTML;
                                 };
                             }
                         } else if (bindObj.element.hasAttribute("sd-rdo")) {
-                            refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"));
-                            if (typeof refToUpdate !== "function") {
+                            refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"), false, true);
+                            if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
                                 bindObj.updater = function() {
                                     let value: any;
                                     Array.from(document.getElementsByName(bindObj.element.name)).some(function(
@@ -252,7 +292,7 @@ interface Window {
                                             return true;
                                         }
                                     });
-                                    refToUpdate = value;
+                                    refToUpdate[refToUpdate.$lastPart] = value;
                                 };
                             }
                         }
@@ -269,10 +309,16 @@ interface Window {
                                 callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
                             }
                             references.forEach(function(reference) {
-                                getRef(reference, getRefData).apply(
-                                    callObject,
-                                    bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
-                                );
+                                if (reference.indexOf("=") !== -1) {
+                                    let refParts = reference.split("=");
+                                    let leftRef = getRef(refParts[0], false, true);
+                                    leftRef[leftRef.$lastPart] = getRef(refParts[1], getRefData);
+                                } else {
+                                    getRef(reference, getRefData).apply(
+                                        callObject,
+                                        bindObj.refArgs.map(refArg => getRef(refArg, getRefData) || refArg)
+                                    );
+                                }
                             });
                         };
                     }
@@ -456,23 +502,33 @@ interface Window {
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
-    // toggleEventListeners: a simple abstraction for reuse
+    // toggleEventListeners: handles adding or removing sd-on listeners
     toggleEventListeners = function(addOrRemove: string, bindObj) {
+        const togglerFnName = addOrRemove + "EventListener";
+        let toggleListener = bindObj.element[togglerFnName];
+        if (bindObj.element.tagName === "input" && bindObj.element.getAttribute("type") === "radio") {
+            let elements: HTMLInputElement[] = Array.from(document.getElementsByName(bindObj.element.name));
+            toggleListener = function(eventName, fn) {
+                elements.forEach(function(element) {
+                    element[togglerFnName](eventName, fn);
+                });
+            };
+        }
         if (bindObj.eventName.indexOf(",") !== -1) {
             bindObj.eventName.split(",").forEach(function(singleEventName) {
                 if (bindObj.listener) {
-                    bindObj.element[addOrRemove + "EventListener"](singleEventName, bindObj.listener);
+                    toggleListener(singleEventName, bindObj.listener);
                 }
                 if (bindObj.updater) {
-                    bindObj.element[addOrRemove + "EventListener"](singleEventName, bindObj.updater);
+                    toggleListener(singleEventName, bindObj.updater);
                 }
             });
         } else {
             if (bindObj.listener) {
-                bindObj.element[addOrRemove + "EventListener"](bindObj.eventName, bindObj.listener);
+                toggleListener(bindObj.eventName, bindObj.listener);
             }
             if (bindObj.updater) {
-                bindObj.element[addOrRemove + "EventListener"](bindObj.eventName, bindObj.updater);
+                toggleListener(bindObj.eventName, bindObj.updater);
             }
         }
     };

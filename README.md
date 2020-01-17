@@ -112,11 +112,36 @@ If the item is not an object, `this[itemName]` will be empty except for the prop
 <element sd-on="event1,event2:reference1,reference2" />
 ```
 
-`reference` should be a function to run when the event is triggered on the element.
+`reference` can be one of...
 
-`this.element` and `this.event` will be available inside the function.
+-   a function to run when the event is triggered on the element.
+-   a simple assignment expression (see below)
+
+If reference is a function, `this.element` and `this.event` will be available inside.
+
+Assignment example:
+
+```html
+<!-- spaces optional (will be ignored) -->
+<element sd-on="event:assignableReference = reference" />
+```
+
+Only include one `sd-on` per radio button group.
 
 ## Extras
+
+### Simple Comparisons
+
+```html
+<!-- spaces optional (will be ignored) -->
+<element sd-if="valueOrFnThatReturnsValue !== valueOrFnThatReturnsValue" />
+<element sd-class="class:valueOrFnThatReturnsValue > valueOrFnThatReturnsValue" />
+<element sd-attr="checked:valueOrFnThatReturnsValue <= valueOrFnThatReturnsValue" />
+```
+
+Allowed comparators: `==`, `===`, `!=`, `!==`, `<`, `>`, `<=`, `>=`
+
+Spaces are optional and will be ignored by the interpreter.
 
 ### Function Reference Arguments
 
