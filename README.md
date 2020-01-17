@@ -141,12 +141,16 @@ Arguments may not include the `:`, `;`, or `,` characters.
 
 ```html
 <!-- examples -->
-<input type="text" sd-attr="value:reference" sd-on="keyup:$update" />
+<input type="text" sd-attr="value:reference" sd-on="change,keyup:$update" />
 <input type="checkbox" sd-attr="checked:reference" sd-on="change:$update" />
 <input type="radio" name="name" value="value" sd-rdo="reference" sd-on="change:$update" />
 <textarea sd-attr="value:reference" sd-on="keydown:$update"></textarea>
 <select sd-attr="value:reference" sd-on="change:$update"></select>
 <div contenteditable="true" sd-html="reference" sd-on="keyup:$update"></div>
+
+<!-- example using $update as one of multiple references -->
+<input type="text" sd-attr="value:reference" sd-on="change:$update,reference" />
+<input type="text" sd-attr="value:reference" sd-on="change:reference,$update,..." />
 ```
 
 ### Available To Your Custom Scripts

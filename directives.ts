@@ -44,6 +44,7 @@ interface Window {
     let getInitialRef: Function;
     let getRef: Function;
     let registerDirectives: Function;
+    let toggleEventListeners: Function;
     let runBinds: Function;
     let unregisterDirectives: Function;
     // bracketsLoop: used within getRef to expand bracket groups in reference strings
@@ -181,9 +182,19 @@ interface Window {
                     bindObj[sdForContext.itemName].$index = sdForIndex;
                 }
                 if (directiveName === "on") {
-                    if (bindObj.reference === "$update") {
+                    let references: string[];
+                    if (bindObj.reference.indexOf(",") !== -1) {
+                        references = bindObj.reference.split(",");
+                    } else {
+                        references = [bindObj.reference];
+                    }
+                    if (references.indexOf("$update") !== -1) {
                         let attrValIndex: number;
                         let refToUpdate: string;
+                        let indexToRemove: number;
+                        while ((indexToRemove = references.indexOf("$update")) !== -1) {
+                            references.splice(indexToRemove, 1);
+                        }
                         if (bindObj.element.hasAttribute("sd-attr")) {
                             if (
                                 bindObj.element.tagName === "input" &&
@@ -199,7 +210,7 @@ interface Window {
                                     }
                                     refToUpdate = getRef(refToUpdate);
                                     if (typeof refToUpdate !== "function") {
-                                        bindObj.listener = function() {
+                                        bindObj.updater = function() {
                                             refToUpdate = bindObj.element.checked;
                                         };
                                     }
@@ -215,7 +226,7 @@ interface Window {
                                     }
                                     refToUpdate = getRef(refToUpdate);
                                     if (typeof refToUpdate !== "function") {
-                                        bindObj.listener = function() {
+                                        bindObj.updater = function() {
                                             refToUpdate = bindObj.element.value;
                                         };
                                     }
@@ -224,44 +235,38 @@ interface Window {
                         } else if (bindObj.element.hasAttribute("sd-html") && bindObj.element.isContentEditable) {
                             refToUpdate = getRef(bindObj.element.getAttribute("sd-html"));
                             if (typeof refToUpdate !== "function") {
-                                bindObj.listener = function() {
+                                bindObj.updater = function() {
                                     refToUpdate = bindObj.element.innerHTML;
                                 };
                             }
                         } else if (bindObj.element.hasAttribute("sd-rdo")) {
                             refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"));
                             if (typeof refToUpdate !== "function") {
-                                bindObj.listener = function() {
+                                bindObj.updater = function() {
                                     let value: any;
-                                    Array.from(document.getElementsByName(bindObj.element.name)).some(function(rdoEl: HTMLInputElement) {
+                                    Array.from(document.getElementsByName(bindObj.element.name)).some(function(
+                                        rdoEl: HTMLInputElement
+                                    ) {
                                         if (rdoEl.checked) {
                                             value = rdoEl.value;
                                             return true;
                                         }
                                     });
-                                    refToUpdate = bindObj.element.innerHTML;
+                                    refToUpdate = value;
                                 };
                             }
                         }
-                        if (!bindObj.listener) {
-                            return false;
-                        }
-                    } else {
+                    }
+                    if (references.length) {
                         bindObj.listener = function(event) {
                             let getRefData: any = false;
                             let callObject: any = {
                                 element: el,
                                 event
                             };
-                            let references: string[];
                             if (sdForContext) {
                                 getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
                                 callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                            }
-                            if (bindObj.reference.indexOf(",") !== -1) {
-                                references = bindObj.reference.split(",");
-                            } else {
-                                references = [bindObj.reference];
                             }
                             references.forEach(function(reference) {
                                 getRef(reference, getRefData).apply(
@@ -271,13 +276,7 @@ interface Window {
                             });
                         };
                     }
-                    if (bindObj.eventName.indexOf(",") !== -1) {
-                        bindObj.eventName.split(",").forEach(function(singleEventName) {
-                            bindObj.element.addEventListener(singleEventName, bindObj.listener);
-                        });
-                    } else {
-                        bindObj.element.addEventListener(bindObj.eventName, bindObj.listener);
-                    }
+                    toggleEventListeners("add", bindObj);
                 }
                 binds[directiveName].push(bindObj);
                 if (directiveName === "if") {
@@ -341,7 +340,8 @@ interface Window {
                     case "for":
                         callObject.itemName = bindObj.itemName;
                         break;
-                    default: break;
+                    default:
+                        break;
                 }
                 if (bindObj.itemNames) {
                     let getRefData = {};
@@ -417,7 +417,9 @@ interface Window {
                         }
                         break;
                     case "rdo":
-                        Array.from(document.getElementsByName(bindObj.element.name)).forEach(function(rdoEl: HTMLInputElement) {
+                        Array.from(document.getElementsByName(bindObj.element.name)).forEach(function(
+                            rdoEl: HTMLInputElement
+                        ) {
                             if (rdoEl.value === value) {
                                 rdoEl.checked = true;
                             } else {
@@ -454,6 +456,26 @@ interface Window {
         });
         setTimeout(runBinds, window.directives.refreshRate);
     };
+    // toggleEventListeners: a simple abstraction for reuse
+    toggleEventListeners = function(addOrRemove: string, bindObj) {
+        if (bindObj.eventName.indexOf(",") !== -1) {
+            bindObj.eventName.split(",").forEach(function(singleEventName) {
+                if (bindObj.listener) {
+                    bindObj.element[addOrRemove + "EventListener"](singleEventName, bindObj.listener);
+                }
+                if (bindObj.updater) {
+                    bindObj.element[addOrRemove + "EventListener"](singleEventName, bindObj.updater);
+                }
+            });
+        } else {
+            if (bindObj.listener) {
+                bindObj.element[addOrRemove + "EventListener"](bindObj.eventName, bindObj.listener);
+            }
+            if (bindObj.updater) {
+                bindObj.element[addOrRemove + "EventListener"](bindObj.eventName, bindObj.updater);
+            }
+        }
+    };
     // unregisterDirectives: destroys binds and listeners for directives on `el` and all children
     unregisterDirectives = function(el: HTMLElement, ignore?: string) {
         let indexToRemove: number;
@@ -462,13 +484,7 @@ interface Window {
                 if (el === document.body) {
                     if (directiveName === "on") {
                         binds.on.forEach(function(bindObj) {
-                            if (bindObj.eventName.indexOf(",") !== -1) {
-                                bindObj.eventName.split(",").forEach(function(singleEventName) {
-                                    bindObj.element.removeEventListener(singleEventName, bindObj.listener);
-                                });
-                            } else {
-                                bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
-                            }
+                            toggleEventListeners("remove", bindObj);
                         });
                     }
                     binds[directiveName].length = 0;
@@ -476,13 +492,7 @@ interface Window {
                     binds[directiveName].map(function(bindObj) {
                         if (el.contains(bindObj.element)) {
                             if (directiveName === "on") {
-                                if (bindObj.eventName.indexOf(",") !== -1) {
-                                    bindObj.eventName.split(",").forEach(function(singleEventName) {
-                                        bindObj.element.removeEventListener(singleEventName, bindObj.listener);
-                                    });
-                                } else {
-                                    bindObj.element.removeEventListener(bindObj.eventName, bindObj.listener);
-                                }
+                                toggleEventListeners("remove", bindObj);
                             }
                             return false;
                         }
