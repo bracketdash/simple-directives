@@ -6,6 +6,68 @@
  *  support documentation changes
  *  clean up, abstract, generally make better
  *  end-to-end testing
+ * 
+ * class SdBase:
+ *  this.element = element;
+ *  isOnChildOf(element):
+ *      return element.contains(this.element)
+ *  isOn(element):
+ *      return element === this.element
+ * 
+ * class SdAttr extends SdBase:
+ *  this.attributeName = attributeName
+ *  this.reference = reference
+ *  run():
+ *      todo
+ * 
+ * class SdClass extends SdBase:
+ *  this.classNames = classNames
+ *  this.reference = reference
+ *  run():
+ *      todo
+ * 
+ * class SdFor extends SdBase:
+ *  this.itemName = itemName
+ *  this.reference = reference
+ *  run():
+ *      todo
+ * 
+ * registerDirectives(element):
+ *  recursive traversal of elements from `element` down
+ *  for each directive on the element:
+ *      expressions.split(";").forEach(expression):
+ *          sd-if:
+ *              hide the element and don't register any other directives on this element
+ *          sd-html:sd-rdo:
+ *              registerDirective(element, directive, [expression])
+ *              break;
+ *          sd-for:
+ *              don't register directives for any child elements (we'll get those during the first run)
+ *          sd-attr:sd-class:sd-on:
+ *              [prereferences, references] = expression.split(":")
+ *              registerDirective(element, directive, references.split(","), prereferences.split(","))
+ *              break;
+ * 
+ * registerDirective(element, directive, references: string[], prereferences?: string[])
+ *  sd-attr: registry.push(new SdAttr(element, prereferences[0], references[0]))
+ *  sd-class: registry.push(new SdClass(element, prereferences, references[0]))
+ *  sd-for: registry.push(new SdFor(element, prereferences[0], references[0]))
+ *  sd-html: register.push(new SdHtml(element, references[0]))
+ *  sd-if: registry.push(new SdIf(element, references[0]))
+ *  sd-on: registry.push(new SdOn(element, prereferences, references))
+ *  sd-rdo: registry.push(new SdRdo(element, references[0]))
+ * 
+ * unregisterDirectives(element)
+ *  registry.forEach(directive):
+ *      if directives.isOn(element) || directive.isOnChildOf(element):
+ *          remove directive from registry
+ * 
+ * runBinds()
+ *  registry.forEach(directive):
+ *      if directive.type != on
+ *          directive.run()
+ *  setTimeout(runBinds, refreshRate)
+ * 
  * */
 
 interface ArrayConstructor {
