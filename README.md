@@ -93,7 +93,7 @@ The reference should evaluate to plain text or a valid HTML fragment.
 
 ### `if` Set Conditions
 
-`sd-if="expression"`
+`sd-if="reference"`
 
 Reference Scope:
 
