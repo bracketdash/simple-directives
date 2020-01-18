@@ -127,6 +127,56 @@ const simpleDirectives = {
         }
         */
     },
+    comparison: function(comparator: string, reference: string, scope: object) {
+        const parts = reference.split(comparator);
+        let left = this.reference(parts[0], scope);
+        let right = this.reference(parts[1], scope);
+        if (typeof left.parent[left.target] === "function") {
+            left = left.parent[left.target].apply(scope);
+        } else if (left.bang) {
+            left = !left.parent[left.target];
+        } else {
+            left = left.parent[left.target];
+        }
+        if (typeof right.parent[right.target] === "function") {
+            right = right.parent[right.target].apply(scope);
+        } else if (right.bang) {
+            right = !right.parent[right.target];
+        } else {
+            right = right.parent[right.target];
+        }
+        let value: boolean;
+        switch (comparator) {
+            case "==":
+                value = left == right;
+                break;
+            case "===":
+                value = left === right;
+                break;
+            case "!=":
+                value = left != right;
+                break;
+            case "!==":
+                value = left != right;
+                break;
+            case "<":
+                value = left < right;
+                break;
+            case ">":
+                value = left > right;
+                break;
+            case "<=":
+                value = left <= right;
+                break;
+            case ">=":
+                value = left >= right;
+                break;
+        }
+        return {
+            parent: { value },
+            target: "value"
+        };
+    },
     preReferenceMap: {
         attr: "attributeName",
         class: "className",
@@ -134,20 +184,30 @@ const simpleDirectives = {
         on: "eventName"
     },
     reference: function(reference: string, scope: object): any {
+        const fallback = {
+            parent: { value: reference },
+            target: "value"
+        };
         const hasBrackets = reference.indexOf("[") !== -1;
         let hasDots = reference.indexOf(".") !== -1;
         let bang = false;
         let parent: object;
         let target: string;
-        if (reference.indexOf("!") === 0) {
-            reference = reference.substring(1);
-            bang = true;
+        if (/[=<!>]/.test(reference)) {
+            if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
+                reference = reference.substring(1);
+                bang = true;
+            } else {
+                let comparator = reference.match(/([=<!>]{2,3})/)[0];
+                if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
+                    return this.comparison(comparator, reference, scope);
+                } else {
+                    return fallback;
+                }
+            }
         }
         if (/[^a-z0-9.[\]$_]/i.test(reference)) {
-            return {
-                parent: { value: reference },
-                target: "value"
-            };
+            return fallback;
         }
         parent = (<any>Object).assign({}, this.root, scope);
         if (!hasBrackets && !hasDots) {
@@ -179,55 +239,6 @@ const simpleDirectives = {
             }
         }
         return { bang, parent, target };
-        
-        // TODO: put tests for comparisons and assignments before `reference` is called
-        // TODO: this is only meant to process actual, single references
-        /*
-        if (/[=<!>]/.test(refStr)) {
-            let comparator = refStr.match(/([=<!>]+)/)[0];
-            if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
-                let expressionParts = refStr.split(comparator);
-                let left = getRef(expressionParts[0]);
-                let right = getRef(expressionParts[1]);
-                if (typeof left === "function") {
-                    left = left.apply(data);
-                }
-                if (typeof right === "function") {
-                    right = right.apply(data);
-                }
-                let value: boolean;
-                switch (comparator) {
-                    case "==":
-                        value = left == right;
-                        break;
-                    case "===":
-                        value = left === right;
-                        break;
-                    case "!=":
-                        value = left != right;
-                        break;
-                    case "!==":
-                        value = left != right;
-                        break;
-                    case "<":
-                        value = left < right;
-                        break;
-                    case ">":
-                        value = left > right;
-                        break;
-                    case "<=":
-                        value = left <= right;
-                        break;
-                    case ">=":
-                        value = left >= right;
-                        break;
-                }
-                return value;
-            } else {
-                return "";
-            }
-        }
-        */
     },
     refreshRate: 100,
     register: function(element: HTMLElement) {
