@@ -1,4 +1,4 @@
-# WIP: A Simple Directives Library
+# A Simple Directives Library
 
 ```html
 <script src="directives.min.js"></script>
@@ -18,10 +18,10 @@ Multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on`:
 
 Notes on vocabulary:
 
--   "Expression" refers to a custom syntax different from normal JavaScript expressions.
--   "Reference" is a dot-and-bracket JSON reference.
-    -   If the reference is a function, it will be evaluated without the use of parentheses.
-    -   You may assign `directives.baseReference` to an object of your choice.
+-   "Expression" refers to a custom syntax.
+-   "Reference" is a dot and bracket reference.
+    -   Don't add parentheses to function references.
+    -   Reassign `directives.baseReference` to any object.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference is a function, the function will have the reference scope available on `this`.
@@ -154,9 +154,7 @@ The reference should evaluate to a string or number.
 
 Only add one `sd-rdo` per radio group.
 
-## Extras
-
-### Function Arguments
+## Function Arguments
 
 Examples:
 
@@ -172,18 +170,8 @@ If you intend to pass a string as the argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
 
-### Registry Controls
+## Refresh Directives
 
-`directives.register(parentElement)`
+For `element` and all children:
 
-`directives.unregister(parentElement)`
-
-Synchronously with directives.js, next in load order:
-
-`directives.skipInit()`
-
-### Config
-
-`directives.baseReference` defaults to `window`.
-
-`directives.refreshRate` defaults to `100` milliseconds.
+`directives.refresh(element)`
