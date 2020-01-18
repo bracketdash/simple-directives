@@ -1,4 +1,4 @@
-# A Simple Directives Library
+# WIP: A Simple Directives Library
 
 ```html
 <script src="directives.min.js"></script>
@@ -7,82 +7,127 @@
 Usage:
 
 ```html
-<element directive="expression">
+<element directive="expression" />
 ```
 
-`directive` should be one of the directives below; `expression` is different depending on the directive.
+Multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on`:
+
+```html
+<element directive="expression;expression;..." />
+```
+
+Notes on vocabulary:
+
+-   "Expression" refers to a custom syntax different from normal JavaScript expressions.
+-   "Argument" sometimes refers to a section of an expression as separated by a colon.
+-   "Reference" is a dot-and-bracket JSON reference (on `window` by default).
+    -   If the reference is a function, it will be evaluated without the use of parentheses.
+    -   You may assign `directives.baseReference` to an object of your choice.
+-   "Reference Scope" refers to additional data available to the reference.
+    -   References to this data can be made as though it is at the root of the base reference.
+    -   If the reference is a function, the function will have the reference scope available on `this`.
 
 ## The Directives
 
-### `sd-attr` binds attributes
+### `attr` Bind Attributes
 
-`expression` should be an attribute name or multiple comma-separated attribute names followed by a colon, then one of...
+`sd-attr="attribute:reference"`
 
--   a single reference to a variable that contains or a function that returns a value
--   a comparison of two references, both of which can be a variable that contains or a function that returns a value
+Multiple semicolon-separated expressions are allowed.
 
-If the reference is a function, `this.element` and `this.attributeName` will be available within. If the reference evaluates to `undefined`, the attribute will be removed from the element if it exists. `expression` can contain multiple semicolon-separated expressions.
+Reference Scope:
 
-### `sd-class` toggles classes
+-   `element`
+-   `attributeName`
 
-`expression` should be a class name or multiple comma-separated class names followed by a colon, then one of...
+Truthy: The given attribute's value will be that of the reference.
 
--   a single reference to a variable that contains or a function that returns a value
--   a comparison of two references, both of which can be a variable that contains or a function that returns a value
+Falsy: The given attribute will not be present on the element.
 
-If the reference is a function, `this.element` and `this.className` will be available within. If the reference evaluates truthy, the target class(es) will exist on the element. `expression` can contain multiple semicolon-separated expressions.
+### `class` Toggle Classes
 
-### `sd-for` loops innerHTML
+`sd-class="class:reference"`
 
-`expression` should be an alias, `itemName`, you would like to assign to each item in the collection followed by a colon and a single reference to a variable that contains or a function that returns an iterable object. If the reference is a function, `this.element` and `this.itemName` will be available within. The contents of the element will be repeated once for each item in the collection. Expressions on directives within the loop will have `this[itemName]` available in addition to any other data on `this` that would normally exist with those directives. `this[itemName]` will contain `$collection`, `$index`, and `$key`. If the item is an object, all the properties of the object will also exist on `this[itemName]`; otherwise, the item will be accessible at `this[itemName].value` instead.
+Multiple semicolon-separated expressions are allowed.
 
-### `sd-html` binds innerHTML
+Multiple comma-separated classes are allowed.
 
-`expression` should be a single reference to a variable that contains or a function that returns a string of plain text or a valid HTML fragment. If the reference is a function, `this.element` will be available within.
+Reference Scope:
 
-### `sd-if` sets conditions
+-   `element`
+-   `className`
 
-`expression` should be one of...
--   a single reference to a variable that contains or a function that returns a value
--   a comparison of two references, both of which can be a variable that contains or a function that returns a value
+The reference can be a comparison of two references.
 
-If the reference is a function, `this.element` will be available within. If the reference evaluates falsy, the element will be hidden and any bindings within will be paused.
+Truthy: The element will have the given class(es).
 
-### `sd-on` sets event listeners
+### `for` Loop Contents Over Data
 
-`expression` should be an event name or multiple comma-separated event names followed by a colon and one of...
--   a reference to a function
--   multiple comma-separated references to functions
--   a simple variable value assignment expression (`assignable = something`)
+`sd-for="item:reference"`
 
-...that you want called when the event(s) fire(s) on the element. Any referenced functions will have `this.element` and `this.event` available within. Only include one `sd-on` per radio button group (listeners will be assigned to all radio buttons in the group). `expression` can contain multiple semicolon-separated expressions.
+"Item" should be the alias you would like to assign to each item in the collection.
 
-### `sd-rdo` binds radio groups
+-   The item will be added under the alias name to each Reference Scope inside the loop.
+-   The item will also have these helpful properties added:
+    -   `$collection`
+    -   `$index`
+    -   `$key`
 
-`expression` should be a single reference to a variable that contains or a function that returns a string. If the reference is a function, `this.element` will be available within. If the reference evaluates to one of the radio group values, the associated radio button will be selected; otherwise, none of the radio buttons will be selected. A name and value must exist on each radio button in the group. If `sd-rdo` exists on more than one radio button of the same group, only the first one will register.
+> Use unique item names in nested loops lest existing aliases be overwritten.
 
-## Extras
+Reference Scope:
 
-### Function Reference Arguments
+-   `element`
+-   `itemName`
 
-```html
-<element sd-on="event:reference:arg" />
+The reference should evaluate to an array of objects.
 
-<!-- allows for multiple arguments -->
-<element sd-on="event:reference:arg1:arg2" />
-```
+### `html` Bind Contents
 
-Argument will be ignored if the reference is not a function.
+`sd-html="reference"`
 
-If the argument is a reference to a defined variable, the function will receive the variable itself.
+Reference Scope:
 
-If the argument is not a valid reference, it will be passed to the function as a string.
+-   `element`
 
-If you intend to pass a string as the argument, don't place quotes around it.
+The reference should evaluate to plain text or a valid HTML fragment.
 
-Arguments may not include the `:`, `;`, or `,` characters.
+### `if` Set Conditions
 
-### Two-Way Bindings with \$update
+`sd-if="expression"`
+
+Reference Scope:
+
+-   `element`
+
+The reference can be a comparison of two references.
+
+Falsy: The element will be hidden and any bindings within will be paused.
+
+### `on` Set Event Listeners
+
+`sd-on="event:reference"`
+
+Multiple semicolon-separated expressions are allowed.
+
+Multiple comma-separated events are allowed.
+
+Multiple comma-separated references are allowed.
+
+Reference Scope:
+
+-   `element`
+-   `event`
+
+The reference should be a function or `assignableReference = referenceOrStringWithoutQuotes`.
+
+All events will be assigned all references in each expression.
+
+Only include one `sd-on` per radio button group (listeners will be assigned to all radio buttons in the group).
+
+#### Two-Way Binding Shortcut
+
+`sd-on:event:$update`
 
 ```html
 <!-- examples -->
@@ -98,15 +143,48 @@ Arguments may not include the `:`, `;`, or `,` characters.
 <input type="text" sd-attr="value:reference" sd-on="change:reference,$update,..." />
 ```
 
-### Available To Your Custom Scripts
+### `rdo` Bind Radio Groups
 
-```javascript
-directives.baseReference = object;
-directives.refreshRate = milliseconds;
+`sd-rdo="reference"`
 
-// refresh the node tree for `parentElement` and all children
-directives.register(parentElement);
+Reference Scope:
 
-// kill simple-directives for `parentElement` and all children
-directives.unregister(parentElement);
-```
+-   `element`
+
+The reference should evaluate to a string or number.
+
+Only add `sd-rdo` to `<input type="radio">` elements with populated `name` and `value` attributes.
+
+Only add one `sd-rdo` per radio group.
+
+## Extras
+
+### Function Arguments
+
+Examples:
+
+`sd-class="class:reference:arg"`
+
+`sd-on="event:reference:arg1:arg2:..."`
+
+If the argument is a reference to a defined variable, the function will receive the variable itself.
+
+If the argument is not a valid reference, it will be passed to the function as a string.
+
+If you intend to pass a string as the argument, don't place quotes around it.
+
+Arguments may not include the `:`, `;`, or `,` characters.
+
+### Registry Controls
+
+Synchronously with directives.js, next in load order: `directives.skipInit()`
+
+`directives.register(parentElement)`
+
+`directives.unregister(parentElement)`
+
+### Config
+
+`directives.baseReference` can be assigned to another object. It defaults to `window`.
+
+`directives.refreshRate` can be assigned a number of milliseconds.

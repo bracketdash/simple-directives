@@ -1,5 +1,13 @@
 // A Simple Directives Library
 // https://github.com/bracketdash/simple-directives/blob/master/README.md
+
+/*
+ * TODO
+ *  support documentation changes
+ *  clean up, abstract, generally make better
+ *  end-to-end testing
+ * */
+
 interface ArrayConstructor {
     from(arrayLike: any, mapFn?, thisArg?): Array<any>;
 }
