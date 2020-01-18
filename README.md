@@ -19,11 +19,10 @@ Multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on`:
 Notes on vocabulary:
 
 -   "Expression" refers to a custom syntax different from normal JavaScript expressions.
--   "Argument" sometimes refers to a section of an expression as separated by a colon.
--   "Reference" is a dot-and-bracket JSON reference (on `window` by default).
+-   "Reference" is a dot-and-bracket JSON reference.
     -   If the reference is a function, it will be evaluated without the use of parentheses.
     -   You may assign `directives.baseReference` to an object of your choice.
--   "Reference Scope" refers to additional data available to the reference.
+-   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference is a function, the function will have the reference scope available on `this`.
 
@@ -65,15 +64,15 @@ Truthy: The element will have the given class(es).
 
 `sd-for="item:reference"`
 
-"Item" should be the alias you would like to assign to each item in the collection.
+"Item" should be the alias to assign to each item.
 
--   The item will be added under the alias name to each Reference Scope inside the loop.
--   The item will also have these helpful properties added:
+-   The aliased item will be in the scope of each reference inside the loop.
+-   The item will also have these properties available:
     -   `$collection`
     -   `$index`
     -   `$key`
 
-> Use unique item names in nested loops lest existing aliases be overwritten.
+> Use unique item names in nested loops to avoid overwrites.
 
 Reference Scope:
 
@@ -102,7 +101,7 @@ Reference Scope:
 
 The reference can be a comparison of two references.
 
-Falsy: The element will be hidden and any bindings within will be paused.
+Falsy: The element will be hidden; bindings within paused.
 
 ### `on` Set Event Listeners
 
@@ -119,11 +118,11 @@ Reference Scope:
 -   `element`
 -   `event`
 
-The reference should be a function or `assignableReference = referenceOrStringWithoutQuotes`.
+The reference should be a function or:
+
+`assignableReference = referenceOrStringWithoutQuotes`
 
 All events will be assigned all references in each expression.
-
-Only include one `sd-on` per radio button group (listeners will be assigned to all radio buttons in the group).
 
 #### Two-Way Binding Shortcut
 
@@ -153,8 +152,6 @@ Reference Scope:
 
 The reference should evaluate to a string or number.
 
-Only add `sd-rdo` to `<input type="radio">` elements with populated `name` and `value` attributes.
-
 Only add one `sd-rdo` per radio group.
 
 ## Extras
@@ -167,9 +164,9 @@ Examples:
 
 `sd-on="event:reference:arg1:arg2:..."`
 
-If the argument is a reference to a defined variable, the function will receive the variable itself.
+Each argument can be treated as a reference except that functions will be passed as-is.
 
-If the argument is not a valid reference, it will be passed to the function as a string.
+If the argument is not a valid reference, it will be passed as a string.
 
 If you intend to pass a string as the argument, don't place quotes around it.
 
@@ -177,14 +174,16 @@ Arguments may not include the `:`, `;`, or `,` characters.
 
 ### Registry Controls
 
-Synchronously with directives.js, next in load order: `directives.skipInit()`
-
 `directives.register(parentElement)`
 
 `directives.unregister(parentElement)`
 
+Synchronously with directives.js, next in load order:
+
+`directives.skipInit()`
+
 ### Config
 
-`directives.baseReference` can be assigned to another object. It defaults to `window`.
+`directives.baseReference` defaults to `window`.
 
-`directives.refreshRate` can be assigned a number of milliseconds.
+`directives.refreshRate` defaults to `100` milliseconds.
