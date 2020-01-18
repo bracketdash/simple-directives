@@ -1,92 +1,122 @@
 // A Simple Directives Library
 // https://github.com/bracketdash/simple-directives/blob/master/README.md
-
-/*
- * TODO
- *  support documentation changes
- *  clean up, abstract, generally make better
- *  end-to-end testing
- * 
- * class SdBase:
- *  this.element = element;
- *  isOnChildOf(element):
- *      return element.contains(this.element)
- *  isOn(element):
- *      return element === this.element
- * 
- * class SdAttr extends SdBase:
- *  this.attributeName = attributeName
- *  this.reference = reference
- *  run():
- *      todo
- * 
- * class SdClass extends SdBase:
- *  this.classNames = classNames
- *  this.reference = reference
- *  run():
- *      todo
- * 
- * class SdFor extends SdBase:
- *  this.itemName = itemName
- *  this.reference = reference
- *  run():
- *      todo
- * 
- * registerDirectives(element):
- *  recursive traversal of elements from `element` down
- *  for each directive on the element:
- *      expressions.split(";").forEach(expression):
- *          sd-if:
- *              hide the element and don't register any other directives on this element
- *          sd-html:sd-rdo:
- *              registerDirective(element, directive, [expression])
- *              break;
- *          sd-for:
- *              don't register directives for any child elements (we'll get those during the first run)
- *          sd-attr:sd-class:sd-on:
- *              [prereferences, references] = expression.split(":")
- *              registerDirective(element, directive, references.split(","), prereferences.split(","))
- *              break;
- * 
- * registerDirective(element, directive, references: string[], prereferences?: string[])
- *  sd-attr: registry.push(new SdAttr(element, prereferences[0], references[0]))
- *  sd-class: registry.push(new SdClass(element, prereferences, references[0]))
- *  sd-for: registry.push(new SdFor(element, prereferences[0], references[0]))
- *  sd-html: register.push(new SdHtml(element, references[0]))
- *  sd-if: registry.push(new SdIf(element, references[0]))
- *  sd-on: registry.push(new SdOn(element, prereferences, references))
- *  sd-rdo: registry.push(new SdRdo(element, references[0]))
- * 
- * unregisterDirectives(element)
- *  registry.forEach(directive):
- *      if directives.isOn(element) || directive.isOnChildOf(element):
- *          remove directive from registry
- * 
- * runBinds()
- *  registry.forEach(directive):
- *      if directive.type != on
- *          directive.run()
- *  setTimeout(runBinds, refreshRate)
- * 
- * */
-
 interface ArrayConstructor {
     from(arrayLike: any, mapFn?, thisArg?): Array<any>;
 }
-interface Directives {
-    baseReference: Object;
-    refreshRate: number;
-    register: Function;
-    unregister: Function;
+interface SimpleDirective {
+    element: HTMLElement;
+    type: string;
 }
+interface SimpleReference {
+    bang: boolean;
+    parent: object;
+    target: string;
+}
+const simpleDirectives = {
+    add: function(element: HTMLElement, type: string, references: string[], preReferences?: string[]) {
+        // TODO
+    },
+    preReferenceMap: {
+        attr: "attributeName",
+        class: "className",
+        for: "itemName",
+        on: "eventName"
+    },
+    reference: function(reference: string): SimpleReference {
+        let bang = false;
+        let parent: object;
+        let target: string;
+        // TODO
+        return { bang, parent, target };
+    },
+    refreshRate: 100,
+    register: function(element: HTMLElement) {
+        let skipChildren = false;
+        ["if", "for", "html", "attr", "rdo", "class", "on"].some(function(type: string) {
+            let skipTheRest = false;
+            const directiveName = `sd-${type}`;
+            if (!element.hasAttribute(directiveName)) {
+                return false;
+            }
+            element
+                .getAttribute(directiveName)
+                .split(";")
+                .forEach(function(expression: string) {
+                    let expressionParts: string[];
+                    switch (type) {
+                        case "if":
+                            element.style.display = "none";
+                            skipTheRest = true;
+                        case "html":
+                        case "rdo":
+                            simpleDirectives.add(element, type, [expression]);
+                            break;
+                        case "for":
+                            skipChildren = true;
+                        case "on":
+                        case "attr":
+                        case "class":
+                            expressionParts = expression.split(":");
+                            simpleDirectives.add(
+                                element,
+                                type,
+                                expressionParts[1].split(","),
+                                expressionParts[0].split(",")
+                            );
+                            break;
+                    }
+                    if (type === "on") {
+                        // TODO: set up event listener(s)
+                    }
+                });
+            if (skipTheRest) {
+                return true;
+            }
+        });
+        if (!skipChildren) {
+            Array.from(element.children).forEach(child => this.register(child));
+        }
+    },
+    registry: [],
+    removeNulls: function(arr: any[]) {
+        let index: number;
+        while ((index = arr.indexOf(null)) !== -1) {
+            this.registry.splice(index, 1);
+        }
+    },
+    root: window,
+    runner: function() {
+        this.registry.forEach(function(directive: SimpleDirective) {
+            if (directive.type !== "on") {
+                this.run(directive);
+            }
+        });
+        setTimeout(this.runner, this.refreshRate);
+    },
+    run: function(directive: SimpleDirective) {
+        // TODO
+    },
+    unregister: function(element: HTMLElement) {
+        this.registry.map(function(directive: SimpleDirective) {
+            if (directive.element === element || element.contains(directive.element)) {
+                if (directive.type === "on") {
+                    // TODO: remove event listener(s)
+                }
+                return null;
+            }
+            return directive;
+        });
+        this.removeNulls(this.registry);
+    }
+};
+
+/* OLD CODE BELOW
+
 interface SdForContext {
     element: HTMLElement;
     itemName: string;
     reference: string;
     value: Object | any[];
-}
-interface Window {
-    directives: Directives;
 }
 (function() {
     const binds = {
@@ -106,9 +136,6 @@ interface Window {
     };
     let elCount = 1;
     let runBindsRunning = false;
-    /* * * * * * *
-     * FUNCTIONS *
-     * * * * * * */
     // these lets are a workaround for a flow analysis bug in the TypeScript compiler (would normally be consts)
     let bracketsLoop: Function;
     let getInitialRef: Function;
@@ -130,7 +157,7 @@ interface Window {
     };
     // getInitialRef: used within getRef to get the initial reference object and add any scope data
     getInitialRef = function(data, jrProp) {
-        let baseRef = (<any>Object).assign(data, window.directives.baseReference);
+        let baseRef = (<any>Object).assign(data, simpleDirectives.baseReference);
         return baseRef[jrProp];
     };
     // getRef: converts a reference string into an actual reference (return empty string if invalid reference)
@@ -161,14 +188,30 @@ interface Window {
                 }
                 let value: boolean;
                 switch (comparator) {
-                    case "==": value = left == right; break;
-                    case "===": value = left === right; break;
-                    case "!=": value = left != right; break;
-                    case "!==": value = left != right; break;
-                    case "<": value = left < right; break;
-                    case ">": value = left > right; break;
-                    case "<=": value = left <= right; break;
-                    case ">=": value = left >= right; break;
+                    case "==":
+                        value = left == right;
+                        break;
+                    case "===":
+                        value = left === right;
+                        break;
+                    case "!=":
+                        value = left != right;
+                        break;
+                    case "!==":
+                        value = left != right;
+                        break;
+                    case "<":
+                        value = left < right;
+                        break;
+                    case ">":
+                        value = left > right;
+                        break;
+                    case "<=":
+                        value = left <= right;
+                        break;
+                    case ">=":
+                        value = left >= right;
+                        break;
                 }
                 return value;
             } else {
@@ -570,7 +613,7 @@ interface Window {
                 }
             }
         });
-        setTimeout(runBinds, window.directives.refreshRate);
+        setTimeout(runBinds, simpleDirectives.refreshRate);
     };
     // toggleEventListeners: handles adding or removing sd-on listeners
     toggleEventListeners = function(addOrRemove: string, bindObj) {
@@ -633,24 +676,5 @@ interface Window {
             }
         });
     };
-    /* * * * * * * *
-     * INITIALIZE  *
-     * * * * * * * */
-    window.directives = {
-        baseReference: window,
-        refreshRate: 100,
-        register: registerDirectives,
-        unregister: unregisterDirectives
-    };
-    if (document.readyState != "loading") {
-        setTimeout(function() {
-            registerDirectives(document.body);
-        });
-    } else {
-        document.addEventListener("DOMContentLoaded", function() {
-            setTimeout(function() {
-                registerDirectives(document.body);
-            });
-        });
-    }
 })();
+*/

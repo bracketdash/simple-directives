@@ -4,6 +4,12 @@
 <script src="directives.min.js"></script>
 ```
 
+Register directives on `element` and all children:
+
+```javascript
+simpleDirectives.register(element);
+```
+
 Usage:
 
 ```html
@@ -21,7 +27,7 @@ Notes on vocabulary:
 -   "Expression" refers to a custom syntax.
 -   "Reference" is a dot and bracket reference.
     -   Don't add parentheses to function references.
-    -   Reassign `directives.baseReference` to any object.
+    -   Reassign `simpleDirectives.root` to any object.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference is a function, the function will have the reference scope available on `this`.
@@ -169,9 +175,3 @@ If the argument is not a valid reference, it will be passed as a string.
 If you intend to pass a string as the argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
-
-## Refresh Directives
-
-For `element` and all children:
-
-`directives.refresh(element)`
