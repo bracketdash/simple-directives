@@ -28,6 +28,7 @@ Notes on vocabulary:
 -   "Reference" is a dot and bracket reference.
     -   Don't add parentheses to function references.
     -   Reassign `simpleDirectives.root` to any object.
+    -   References inside brackets should evaluate to a string or number.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference is a function, the function will have the reference scope available on `this`.
