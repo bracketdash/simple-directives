@@ -6,13 +6,8 @@ interface SimpleDirective {
     events?: string[];
     callbacks?: string[];
 }
-interface SimpleReference {
-    bang: boolean;
-    parent: object;
-    target: string;
-}
 const simpleDirectives = {
-    add: function(element: HTMLElement, type: string, references: string[], preReferences?: string[]) {
+    add: function(element: HTMLElement, type: string, references: string[], preReferences?: string[]): any {
         if (type === "on") {
             this.toggleEventListeners("add", element, preReferences, references);
         }
@@ -138,161 +133,134 @@ const simpleDirectives = {
         for: "itemName",
         on: "eventName"
     },
-    reference: function(reference: string): SimpleReference {
+    reference: function(reference: string, scope: object): any {
+        const hasBrackets = reference.indexOf("[") !== -1;
+        let hasDots = reference.indexOf(".") !== -1;
         let bang = false;
         let parent: object;
         let target: string;
-        // TODO
-        /*
-        bracketsLoop = function(loopRef) {
-            loopRef = loopRef.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
-                return "." + getRef(capture);
-            });
-            if (/\[[^\[\]]*\]/.test(loopRef)) {
-                return bracketsLoop(loopRef);
-            } else {
-                return loopRef;
-            }
-        };
-        getInitialRef = function(data, jrProp) {
-            let baseRef = (<any>Object).assign(data, simpleDirectives.baseReference);
-            return baseRef[jrProp];
-        };
-        getRef = function(refStr: string, data?: Object, preserveReference?: boolean) {
-            let hasBrackets = refStr.indexOf("[") !== -1;
-            let hasDots = refStr.indexOf(".") !== -1;
-            let lastPart: string;
-            let reference;
-            let returnOpposite = false;
-            if (refStr.indexOf("!") === 0) {
-                refStr = refStr.substring(1);
-                returnOpposite = true;
-            }
-            if (!data) {
-                data = {};
-            }
-            if (/[=<!>]/.test(refStr)) {
-                let comparator = refStr.match(/([=<!>]+)/)[0];
-                if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
-                    let expressionParts = refStr.split(comparator);
-                    let left = getRef(expressionParts[0]);
-                    let right = getRef(expressionParts[1]);
-                    if (typeof left === "function") {
-                        left = left.apply(data);
-                    }
-                    if (typeof right === "function") {
-                        right = right.apply(data);
-                    }
-                    let value: boolean;
-                    switch (comparator) {
-                        case "==":
-                            value = left == right;
-                            break;
-                        case "===":
-                            value = left === right;
-                            break;
-                        case "!=":
-                            value = left != right;
-                            break;
-                        case "!==":
-                            value = left != right;
-                            break;
-                        case "<":
-                            value = left < right;
-                            break;
-                        case ">":
-                            value = left > right;
-                            break;
-                        case "<=":
-                            value = left <= right;
-                            break;
-                        case ">=":
-                            value = left >= right;
-                            break;
-                    }
-                    return value;
-                } else {
-                    return "";
-                }
-            }
-            if (/[^a-z0-9.[\]:;,$_]/i.test(refStr)) {
-                return "";
-            }
-            if (!hasBrackets && !hasDots) {
-                reference = getInitialRef(data, refStr);
-            } else {
-                if (hasBrackets) {
-                    refStr = bracketsLoop(refStr);
-                    if (!hasDots) {
-                        hasDots = true;
-                    }
-                }
-                if (hasDots) {
-                    let refParts = refStr.split(".");
-                    refParts.forEach(function(refPart, index) {
-                        if (!index) {
-                            reference = getInitialRef(data, refPart);
-                        } else if (typeof reference === "object" && reference[refPart]) {
-                            if (preserveReference && index === refParts.length - 1) {
-                                lastPart = refPart;
-                            } else {
-                                reference = reference[refPart];
-                            }
-                        } else {
-                            reference = "";
-                        }
+        if (reference.indexOf("!") === 0) {
+            reference = reference.substring(1);
+            bang = true;
+        }
+        if (/[^a-z0-9.[\]$_]/i.test(reference)) {
+            return {
+                parent: { value: reference },
+                target: "value"
+            };
+        }
+        parent = (<any>Object).assign({}, this.root, scope);
+        if (!hasBrackets && !hasDots) {
+            target = reference;
+        } else {
+            if (hasBrackets) {
+                while (/\[[^\[\]]*\]/.test(reference)) {
+                    reference = reference.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
+                        return "." + simpleDirectives.reference(capture, scope);
                     });
                 }
+                if (!hasDots) {
+                    hasDots = true;
+                }
             }
-            if (preserveReference && lastPart) {
-                reference.$lastPart = lastPart;
-                reference.$returnOpposite = returnOpposite;
-                return reference;
+            if (hasDots) {
+                let parts = reference.split(".");
+                parts.some(function(part, index) {
+                    if (index === parts.length - 1) {
+                        target = part;
+                    } else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
+                        parent = parent[part];
+                    } else {
+                        parent = { value: reference };
+                        target = "value";
+                        return true;
+                    }
+                });
             }
-            return returnOpposite ? !reference : reference;
+        }
+        return { bang, parent, target };
+        
+        // TODO: put tests for comparisons and assignments before `reference` is called
+        // TODO: this is only meant to process actual, single references
+        /*
+        if (/[=<!>]/.test(refStr)) {
+            let comparator = refStr.match(/([=<!>]+)/)[0];
+            if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
+                let expressionParts = refStr.split(comparator);
+                let left = getRef(expressionParts[0]);
+                let right = getRef(expressionParts[1]);
+                if (typeof left === "function") {
+                    left = left.apply(data);
+                }
+                if (typeof right === "function") {
+                    right = right.apply(data);
+                }
+                let value: boolean;
+                switch (comparator) {
+                    case "==":
+                        value = left == right;
+                        break;
+                    case "===":
+                        value = left === right;
+                        break;
+                    case "!=":
+                        value = left != right;
+                        break;
+                    case "!==":
+                        value = left != right;
+                        break;
+                    case "<":
+                        value = left < right;
+                        break;
+                    case ">":
+                        value = left > right;
+                        break;
+                    case "<=":
+                        value = left <= right;
+                        break;
+                    case ">=":
+                        value = left >= right;
+                        break;
+                }
+                return value;
+            } else {
+                return "";
+            }
         }
         */
-        return { bang, parent, target };
     },
     refreshRate: 100,
     register: function(element: HTMLElement) {
+        let directiveName: string;
+        let expressions: string[];
         let skipChildren = false;
-        ["if", "for", "html", "attr", "rdo", "class", "on"].some(function(type: string) {
-            let skipTheRest = false;
-            const directiveName = `sd-${type}`;
-            if (!element.hasAttribute(directiveName)) {
+        ["if", "attr", "class", "for", "html", "on", "rdo"].some(function(type: string) {
+            directiveName = `sd-${type}`;
+            if (element.hasAttribute(directiveName)) {
+                expressions = element.getAttribute(directiveName).split(";");
+            } else {
                 return false;
             }
-            element
-                .getAttribute(directiveName)
-                .split(";")
-                .forEach(function(expression: string) {
-                    let expressionParts: string[];
-                    switch (type) {
-                        case "if":
-                            element.style.display = "none";
-                            skipTheRest = true;
-                        case "html":
-                        case "rdo":
-                            simpleDirectives.add(element, type, [expression]);
-                            break;
-                        case "for":
-                            skipChildren = true;
-                        case "on":
-                        case "attr":
-                        case "class":
-                            expressionParts = expression.split(":");
-                            simpleDirectives.add(
-                                element,
-                                type,
-                                expressionParts[1].split(","),
-                                expressionParts[0].split(",")
-                            );
-                            break;
-                    }
+            if (type === "if") {
+                if (simpleDirectives.add(element, type, expressions)) {
+                    element.style.display = "none";
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            if (type === "for") {
+                skipChildren = true;
+            }
+            if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
+                expressions.forEach(function(expression: string) {
+                    const [references, preReferences] = expression.split(":");
+                    simpleDirectives.add(element, type, references.split(","), preReferences.split(","));
                 });
-            if (skipTheRest) {
-                return true;
+            } else {
+                expressions.forEach(function(expression: string) {
+                    simpleDirectives.add(element, type, [expression]);
+                });
             }
         });
         if (!skipChildren) {
@@ -597,16 +565,13 @@ const simpleDirectives = {
         }
         */
     },
-    unregister: function(element: HTMLElement) {
+    unregister: function(parentElement: HTMLElement) {
         this.registry.map(function(directive: SimpleDirective) {
-            if (directive.element === element || element.contains(directive.element)) {
-                if (directive.type === "on") {
-                    simpleDirectives.toggleEventListeners(
-                        "remove",
-                        directive.element,
-                        directive.events,
-                        directive.callbacks
-                    );
+            let { element, type } = directive;
+            if (element === parentElement || parentElement.contains(element)) {
+                if (type === "on") {
+                    let { events, callbacks } = directive;
+                    simpleDirectives.toggleEventListeners("remove", element, events, callbacks);
                 }
                 return null;
             }
