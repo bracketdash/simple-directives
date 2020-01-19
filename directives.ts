@@ -34,40 +34,44 @@ const simpleDirectives = {
             });
         },
         getAction: function(directive: SimpleDirective, reference: string): Function {
+            let action: Function;
             if (reference === "$update") {
                 return simpleDirectives.events.getUpdater(directive);
             }
-            // TODO
-            // don't forget about adding scope to references and `this` on functions
-            const action = function() {
-                // TODO
-            };
-            return action;
-            /*
-            bindObj.listener = function(event) {
-                let getRefData: any = false;
-                let callObject: any = {
-                    element: el,
-                    event
-                };
-                if (sdForContext) {
-                    getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
-                    callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
+            if (reference.indexOf("=") !== -1) {
+                const parts = reference.split("=");
+                const left = simpleDirectives.references.convert(parts[0], directive);
+                const right = simpleDirectives.references.convert(parts[1], directive);
+                if (right.bang) {
+                    action = function() {
+                        if (typeof right.parent[right.target] === "function") {
+                            left.parent[left.target] = !right.parent[right.target]();
+                        } else {
+                            left.parent[left.target] = !right.parent[right.target];
+                        }
+                    };
+                } else {
+                    action = function() {
+                        if (typeof right.parent[right.target] === "function") {
+                            left.parent[left.target] = right.parent[right.target]();
+                        } else {
+                            left.parent[left.target] = right.parent[right.target];
+                        }
+                    };
                 }
-                references.forEach(function(reference) {
-                    if (reference.indexOf("=") !== -1) {
-                        let refParts = reference.split("=");
-                        let leftRef = getRef(refParts[0], false, true);
-                        leftRef[leftRef.$lastPart] = getRef(refParts[1], getRefData);
-                    } else {
-                        getRef(reference, getRefData).apply(
-                            callObject,
-                            bindObj.refArgs.map(refArg => getRef(refArg, getRefData) || refArg)
-                        );
-                    }
-                });
-            };
-            */
+            } else {
+                const parts = reference.split(":");
+                const value = simpleDirectives.references.convert(parts[0], directive);
+                reference = parts.shift();
+                action = function() {
+                    let args = parts.map(function(arg) {
+                        let value = simpleDirectives.references.convert(arg, directive);
+                        return value.parent[value.target];
+                    });
+                    value.parent[value.target].apply(directive, args);
+                };
+            }
+            return action;
         },
         getUpdater: function(directive: SimpleDirective): Function {
             // TODO
@@ -148,6 +152,10 @@ const simpleDirectives = {
             // TODO
             // check if reference exists in this.proxies first - if so, just add more to the same proxy handler
             // check out why Vue.delete and Vue.set are needed; we probably need the same thing
+            // `sd-for` needs to be deep-proxied, btw (array of objects)
+            // other references should evaluate to simple values
+            // don't forget about comparisons -- will need to proxy to both sub-references
+            // if it's not an `sd-for` but the reference is to an object, proxy for truthy or falsy changes only
             /*
             const preReferenceMap = {
                 attr: "attributeName",
