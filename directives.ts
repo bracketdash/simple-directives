@@ -1,11 +1,16 @@
 // A Simple Directives Library
 // https://github.com/bracketdash/simple-directives/blob/master/README.md
+interface RevocableProxy {
+    proxy: any,
+    revoke: Function;
+}
 interface SimpleDirective {
     element: HTMLElement;
     listener?: EventListenerObject;
     originalHTML?: string;
     preReferences?: string[];
     proxyAction?: Function;
+    proxyRef?: RevocableProxy;
     references: string[];
     type: string;
 }
@@ -148,7 +153,7 @@ const simpleDirectives = {
         }
     },
     proxies: {
-        addHandler: function(directive: SimpleDirective) {
+        addAction: function(directive: SimpleDirective) {
             // TODO
             // check if reference exists in this.proxies first - if so, just add more to the same proxy handler
             // check out why Vue.delete and Vue.set are needed; we probably need the same thing
@@ -305,7 +310,7 @@ const simpleDirectives = {
             */
         },
         cache: {},
-        removeHandler: function(directive: SimpleDirective) {
+        removeAction: function(directive: SimpleDirective) {
             directive.references.forEach(function(reference) {
                 simpleDirectives.proxies.cache[reference].map(function(action: Function) {
                     if (action === directive.proxyAction) {
@@ -315,6 +320,10 @@ const simpleDirectives = {
                     }
                 });
                 simpleDirectives.tools.removeNulls(simpleDirectives.proxies.cache[reference]);
+                if (!simpleDirectives.proxies.cache[reference].length) {
+                    directive.proxyRef.revoke();
+                    delete simpleDirectives.proxies.cache[reference];
+                }
             });
         }
     },
@@ -474,7 +483,7 @@ const simpleDirectives = {
             if (type === "on") {
                 simpleDirectives.events.addListeners(directive);
             } else {
-                simpleDirectives.proxies.addHandler(directive);
+                simpleDirectives.proxies.addAction(directive);
             }
             if (!existingRdoFound) {
                 simpleDirectives.registry.cache.push(directive);
@@ -543,7 +552,7 @@ const simpleDirectives = {
                             element.removeEventListener(event, directive.listener);
                         });
                     } else {
-                        simpleDirectives.proxies.removeHandler(directive);
+                        simpleDirectives.proxies.removeAction(directive);
                     }
                     return null;
                 }
