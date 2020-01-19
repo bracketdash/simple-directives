@@ -1,10 +1,12 @@
 // A Simple Directives Library
 // https://github.com/bracketdash/simple-directives/blob/master/README.md
 interface SimpleDirective {
-    callbacks?: string[];
     element: HTMLElement;
-    events?: string[];
     listener?: EventListenerObject;
+    originalHTML?: string;
+    preReferences?: string[];
+    proxyHandler?: Function;
+    references: string[];
     type: string;
 }
 interface SimpleReference {
@@ -13,6 +15,8 @@ interface SimpleReference {
     refArgs?: string[];
     target: string;
 }
+// TODO: organize the simpleDirectives object, group together related properties
+// TODO: replace any `this` that refers to the simpleDirectives object with `simpleDirectives`
 const simpleDirectives = {
     add: function(
         element: HTMLElement,
@@ -21,7 +25,7 @@ const simpleDirectives = {
         preReferences?: string[],
         scope?: object
     ): boolean {
-        let directive: any = { element, type, references };
+        let directive: SimpleDirective = { element, type, references };
         let existingRdoFound = false;
         let response = true;
         let simpleReference: SimpleReference;
@@ -43,9 +47,6 @@ const simpleDirectives = {
                     response = !!simpleReference.parent[simpleReference.target];
                 }
                 break;
-            case "on":
-                directive.listener = this.addEventListeners(directive);
-                break;
             case "rdo":
                 this.registry.some(function(directive: SimpleDirective) {
                     if (directive.type === "rdo" && directive.element === element) {
@@ -56,12 +57,17 @@ const simpleDirectives = {
             default:
                 break;
         }
+        if (type === "on") {
+            this.addEventListeners(directive);
+        } else {
+            this.addProxyHandler(directive);
+        }
         if (!existingRdoFound) {
             this.registry.push(directive);
         }
         return response;
     },
-    addEventListeners: function(directive: SimpleDirective): EventListenerObject {
+    addEventListeners: function(directive: SimpleDirective) {
         /*
         if (references.indexOf("$update") !== -1) {
             let attrValIndex: number;
@@ -185,229 +191,17 @@ const simpleDirectives = {
             }
         }
         */
-        const listener: EventListenerObject = {
+        // TODO
+        directive.listener = {
             handleEvent: function(event: Event) {
                 // TODO
             }
         };
-        return listener;
     },
-    comparison: function(comparator: string, reference: string, scope: object): SimpleReference {
-        const parts = reference.split(comparator);
-        let left: any = this.reference(parts[0], scope);
-        let right: any = this.reference(parts[1], scope);
-        if (typeof left.parent[left.target] === "function") {
-            left = left.parent[left.target].apply(scope);
-        } else if (left.bang) {
-            left = !left.parent[left.target];
-        } else {
-            left = left.parent[left.target];
-        }
-        if (typeof right.parent[right.target] === "function") {
-            right = right.parent[right.target].apply(scope);
-        } else if (right.bang) {
-            right = !right.parent[right.target];
-        } else {
-            right = right.parent[right.target];
-        }
-        let value: boolean;
-        switch (comparator) {
-            case "==":
-                value = left == right;
-                break;
-            case "===":
-                value = left === right;
-                break;
-            case "!=":
-                value = left != right;
-                break;
-            case "!==":
-                value = left != right;
-                break;
-            case "<":
-                value = left < right;
-                break;
-            case ">":
-                value = left > right;
-                break;
-            case "<=":
-                value = left <= right;
-                break;
-            case ">=":
-                value = left >= right;
-                break;
-        }
-        return {
-            parent: { value },
-            target: "value"
-        };
-    },
-    preReferenceMap: {
-        attr: "attributeName",
-        class: "className",
-        for: "itemName",
-        on: "eventName"
-    },
-    reference: function(reference: string, scope: object): SimpleReference {
-        const fallback = {
-            parent: { value: reference },
-            target: "value"
-        };
-        const hasBrackets = reference.indexOf("[") !== -1;
-        let bang = false;
-        let hasDots: boolean;
-        let parent: object;
-        let refArgs = reference.split(":");
-        let target: string;
-        reference = refArgs.shift();
-        hasDots = reference.indexOf(".") !== -1;
-        if (/[=<!>]/.test(reference)) {
-            if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
-                reference = reference.substring(1);
-                bang = true;
-            } else {
-                let comparator = reference.match(/([=<!>]{2,3})/)[0];
-                if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
-                    return this.comparison(comparator, reference, scope);
-                } else {
-                    return fallback;
-                }
-            }
-        }
-        if (/[^a-z0-9.[\]$_]/i.test(reference)) {
-            return fallback;
-        }
-        parent = (<any>Object).assign({}, this.root, scope);
-        if (!hasBrackets && !hasDots) {
-            target = reference;
-        } else {
-            if (hasBrackets) {
-                while (/\[[^\[\]]*\]/.test(reference)) {
-                    reference = reference.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
-                        let capRef = simpleDirectives.reference(capture, scope);
-                        return "." + capRef.parent[capRef.target];
-                    });
-                }
-                if (!hasDots) {
-                    hasDots = true;
-                }
-            }
-            if (hasDots) {
-                let parts = reference.split(".");
-                parts.some(function(part, index) {
-                    if (index === parts.length - 1) {
-                        target = part;
-                    } else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
-                        parent = parent[part];
-                    } else {
-                        parent = { value: reference };
-                        target = "value";
-                        return true;
-                    }
-                });
-            }
-        }
-        return { bang, parent, target, refArgs };
-    },
-    refreshRate: 100,
-    register: function(element: HTMLElement, skipUnregister?: boolean, scope?: object) {
-        let directiveName: string;
-        let expressions: string[];
-        let skipChildren = false;
-        if (!this.running) {
-            this.runner();
-        }
-        if (!skipUnregister) {
-            this.unregister(element);
-        }
-        ["if", "attr", "class", "for", "html", "on", "rdo"].some(function(type: string) {
-            let value: boolean;
-            directiveName = `sd-${type}`;
-            if (element.hasAttribute(directiveName)) {
-                expressions = element
-                    .getAttribute(directiveName)
-                    .replace(/\s+/, "")
-                    .split(";");
-            } else {
-                return false;
-            }
-            if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
-                expressions.forEach(function(expression: string) {
-                    const parts = expression.split(":");
-                    const preReferences = parts.shift().split(",");
-                    const references = parts.join(":").split(",");
-                    if (scope) {
-                        simpleDirectives.add(element, type, references, preReferences, scope);
-                    } else {
-                        simpleDirectives.add(element, type, references, preReferences);
-                    }
-                });
-            } else if (scope) {
-                value = simpleDirectives.add(element, type, [expressions[0]], [], scope);
-            } else {
-                value = simpleDirectives.add(element, type, [expressions[0]]);
-            }
-            if (type === "if") {
-                if (value === false) {
-                    element.style.display = "none";
-                    skipChildren = true;
-                    return true;
-                } else {
-                    return false;
-                }
-            } else if (type === "for") {
-                skipChildren = true;
-            }
-        });
-        if (!skipChildren) {
-            Array.from(element.children).forEach(child => this.register(child, true));
-        }
-    },
-    registry: [],
-    removeNulls: function(arr: any[]) {
-        let index: number;
-        while ((index = arr.indexOf(null)) !== -1) {
-            this.registry.splice(index, 1);
-        }
-    },
-    root: window,
-    runner: function() {
-        if (!this.running) {
-            this.running = true;
-        }
-        this.registry.forEach(function(directive: SimpleDirective) {
-            if (directive.type !== "on") {
-                this.run(directive);
-            }
-        });
-        setTimeout(this.runner, this.refreshRate);
-    },
-    running: false,
-    run: function(directive: SimpleDirective) {
-        /* TODO: set up $context, $index, and $key in run()
-        if (Array.isArray(sdForContext.value)) {
-            if (typeof sdForContext.value[sdForIndex] === "object") {
-                bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
-            } else {
-                bindObj[sdForContext.itemName] = {
-                    value: sdForContext.value[sdForIndex]
-                };
-            }
-            bindObj[sdForContext.itemName].$key = sdForIndex;
-        } else {
-            let key = Object.keys(sdForContext.value)[sdForIndex];
-            if (typeof sdForContext.value[key] === "object") {
-                bindObj[sdForContext.itemName] = sdForContext.value[key];
-            } else {
-                bindObj[sdForContext.itemName] = {
-                    value: sdForContext.value[key]
-                };
-            }
-            bindObj[sdForContext.itemName].$key = key;
-        }
-        bindObj[sdForContext.itemName].$collection = sdForContext.value;
-        bindObj[sdForContext.itemName].$index = sdForIndex;
-        */
+    addProxyHandler: function(directive: SimpleDirective) {
+        // TODO
+        // check if reference exists in this.proxies first - if so, just add more to the same proxy handler
+        // check out why Vue.delete and Vue.set are needed; we probably need the same thing
         /*
         let indexToRemove: number;
         if (!runBindsRunning) {
@@ -550,14 +344,198 @@ const simpleDirectives = {
         });
         */
     },
+    comparison: function(comparator: string, reference: string, scope: object): SimpleReference {
+        const parts = reference.split(comparator);
+        let left: any = this.reference(parts[0], scope);
+        let right: any = this.reference(parts[1], scope);
+        if (typeof left.parent[left.target] === "function") {
+            left = left.parent[left.target].apply(scope);
+        } else if (left.bang) {
+            left = !left.parent[left.target];
+        } else {
+            left = left.parent[left.target];
+        }
+        if (typeof right.parent[right.target] === "function") {
+            right = right.parent[right.target].apply(scope);
+        } else if (right.bang) {
+            right = !right.parent[right.target];
+        } else {
+            right = right.parent[right.target];
+        }
+        let value: boolean;
+        switch (comparator) {
+            case "==":
+                value = left == right;
+                break;
+            case "===":
+                value = left === right;
+                break;
+            case "!=":
+                value = left != right;
+                break;
+            case "!==":
+                value = left != right;
+                break;
+            case "<":
+                value = left < right;
+                break;
+            case ">":
+                value = left > right;
+                break;
+            case "<=":
+                value = left <= right;
+                break;
+            case ">=":
+                value = left >= right;
+                break;
+        }
+        return {
+            parent: { value },
+            target: "value"
+        };
+    },
+    preReferenceMap: {
+        attr: "attributeName",
+        class: "className",
+        for: "itemName",
+        on: "eventName"
+    },
+    proxies: [],
+    reference: function(reference: string, scope: object): SimpleReference {
+        const fallback = {
+            parent: { value: reference },
+            target: "value"
+        };
+        const hasBrackets = reference.indexOf("[") !== -1;
+        let bang = false;
+        let hasDots: boolean;
+        let parent: object;
+        let refArgs = reference.split(":");
+        let target: string;
+        reference = refArgs.shift();
+        hasDots = reference.indexOf(".") !== -1;
+        if (/[=<!>]/.test(reference)) {
+            if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
+                reference = reference.substring(1);
+                bang = true;
+            } else {
+                let comparator = reference.match(/([=<!>]{2,3})/)[0];
+                if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
+                    return this.comparison(comparator, reference, scope);
+                } else {
+                    return fallback;
+                }
+            }
+        }
+        if (/[^a-z0-9.[\]$_]/i.test(reference)) {
+            return fallback;
+        }
+        parent = (<any>Object).assign({}, this.root, scope);
+        if (!hasBrackets && !hasDots) {
+            target = reference;
+        } else {
+            if (hasBrackets) {
+                while (/\[[^\[\]]*\]/.test(reference)) {
+                    reference = reference.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
+                        let capRef = simpleDirectives.reference(capture, scope);
+                        return "." + capRef.parent[capRef.target];
+                    });
+                }
+                if (!hasDots) {
+                    hasDots = true;
+                }
+            }
+            if (hasDots) {
+                let parts = reference.split(".");
+                parts.some(function(part, index) {
+                    if (index === parts.length - 1) {
+                        target = part;
+                    } else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
+                        parent = parent[part];
+                    } else {
+                        parent = { value: reference };
+                        target = "value";
+                        return true;
+                    }
+                });
+            }
+        }
+        return { bang, parent, target, refArgs };
+    },
+    register: function(element: HTMLElement, skipUnregister?: boolean, scope?: object) {
+        let directiveName: string;
+        let expressions: string[];
+        let skipChildren = false;
+        if (!this.running) {
+            this.runner();
+        }
+        if (!skipUnregister) {
+            this.unregister(element);
+        }
+        ["if", "attr", "class", "for", "html", "on", "rdo"].some(function(type: string) {
+            let value: boolean;
+            directiveName = `sd-${type}`;
+            if (element.hasAttribute(directiveName)) {
+                expressions = element
+                    .getAttribute(directiveName)
+                    .replace(/\s+/, "")
+                    .split(";");
+            } else {
+                return false;
+            }
+            if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
+                expressions.forEach(function(expression: string) {
+                    const parts = expression.split(":");
+                    const preReferences = parts.shift().split(",");
+                    const references = parts.join(":").split(",");
+                    if (scope) {
+                        simpleDirectives.add(element, type, references, preReferences, scope);
+                    } else {
+                        simpleDirectives.add(element, type, references, preReferences);
+                    }
+                });
+            } else if (scope) {
+                value = simpleDirectives.add(element, type, [expressions[0]], [], scope);
+            } else {
+                value = simpleDirectives.add(element, type, [expressions[0]]);
+            }
+            if (type === "if") {
+                if (value === false) {
+                    element.style.display = "none";
+                    skipChildren = true;
+                    return true;
+                } else {
+                    return false;
+                }
+            } else if (type === "for") {
+                skipChildren = true;
+            }
+        });
+        if (!skipChildren) {
+            Array.from(element.children).forEach(child => this.register(child, true));
+        }
+    },
+    registry: [],
+    removeNulls: function(arr: any[]) {
+        let index: number;
+        while ((index = arr.indexOf(null)) !== -1) {
+            this.registry.splice(index, 1);
+        }
+    },
+    removeProxyHandler: function(directive: SimpleDirective) {
+        // TODO
+    },
+    root: window,
     unregister: function(parentElement: HTMLElement) {
-        this.registry.map(function(directive: SimpleDirective) {
+        this.registry = this.registry.map(function(directive: SimpleDirective) {
             let { element, type } = directive;
             if (element === parentElement || parentElement.contains(element)) {
                 if (type === "on") {
-                    directive.events.forEach(function(event) {
+                    directive.preReferences.forEach(function(event) {
                         element.removeEventListener(event, directive.listener);
                     });
+                } else if (["TODO"].indexOf(type) !== -1) {
+                    simpleDirectives.removeProxyHandler(directive);
                 }
                 return null;
             }
