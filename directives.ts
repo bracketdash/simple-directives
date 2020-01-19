@@ -16,6 +16,133 @@ interface SimpleReference {
     target: string;
 }
 const simpleDirectives = {
+    events: {
+        addListeners: function(directive: SimpleDirective) {
+            let actions: Function[] = [];
+            directive.references.forEach(function(reference) {
+                actions.push(simpleDirectives.events.getAction(directive, reference));
+            });
+            directive.listener = {
+                handleEvent: function(event: Event) {
+                    actions.forEach(function(action: Function) {
+                        action();
+                    });
+                }
+            };
+            directive.preReferences.forEach(function(eventName) {
+                directive.element.addEventListener(eventName, directive.listener);
+            });
+        },
+        getAction: function(directive: SimpleDirective, reference: string): Function {
+            if (reference === "$update") {
+                return simpleDirectives.events.getUpdater(directive);
+            }
+            // TODO
+            // don't forget about adding scope to references and `this` on functions
+            const action = function() {
+                // TODO
+            };
+            return action;
+            /*
+            bindObj.listener = function(event) {
+                let getRefData: any = false;
+                let callObject: any = {
+                    element: el,
+                    event
+                };
+                if (sdForContext) {
+                    getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
+                    callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
+                }
+                references.forEach(function(reference) {
+                    if (reference.indexOf("=") !== -1) {
+                        let refParts = reference.split("=");
+                        let leftRef = getRef(refParts[0], false, true);
+                        leftRef[leftRef.$lastPart] = getRef(refParts[1], getRefData);
+                    } else {
+                        getRef(reference, getRefData).apply(
+                            callObject,
+                            bindObj.refArgs.map(refArg => getRef(refArg, getRefData) || refArg)
+                        );
+                    }
+                });
+            };
+            */
+        },
+        getUpdater: function(directive: SimpleDirective): Function {
+            // TODO
+            return function() {};
+            /*
+            let attrValIndex: number;
+            let refToUpdate;
+            let indexToRemove: number;
+            while ((indexToRemove = references.indexOf("$update")) !== -1) {
+                references.splice(indexToRemove, 1);
+            }
+            if (bindObj.element.hasAttribute("sd-attr")) {
+                if (
+                    bindObj.element.tagName === "input" &&
+                    ["checkbox", "radio"].indexOf(bindObj.element.getAttribute("type")) !== -1
+                ) {
+                    refToUpdate = bindObj.element.getAttribute("sd-attr");
+                    attrValIndex = refToUpdate.indexOf("checked");
+                    if (attrValIndex !== -1) {
+                        refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
+                        attrValIndex = refToUpdate.indexOf(";");
+                        if (attrValIndex !== -1) {
+                            refToUpdate = refToUpdate.substring(0, attrValIndex);
+                        }
+                        refToUpdate = getRef(refToUpdate, false, true);
+                        if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
+                            bindObj.updater = function() {
+                                refToUpdate[refToUpdate.$lastPart] = bindObj.element.checked;
+                            };
+                        }
+                    }
+                } else {
+                    refToUpdate = bindObj.element.getAttribute("sd-attr");
+                    attrValIndex = refToUpdate.indexOf("value");
+                    if (attrValIndex !== -1) {
+                        refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
+                        attrValIndex = refToUpdate.indexOf(";");
+                        if (attrValIndex !== -1) {
+                            refToUpdate = refToUpdate.substring(0, attrValIndex);
+                        }
+                        refToUpdate = getRef(refToUpdate, false, true);
+                        if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
+                            bindObj.updater = function() {
+                                refToUpdate[refToUpdate.$lastPart] = bindObj.element.value;
+                            };
+                        }
+                    }
+                }
+            } else if (bindObj.element.hasAttribute("sd-html") && bindObj.element.isContentEditable) {
+                refToUpdate = getRef(bindObj.element.getAttribute("sd-html"), false, true);
+                if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
+                    bindObj.updater = function() {
+                        refToUpdate[refToUpdate.$lastPart] = bindObj.element.innerHTML;
+                    };
+                }
+            } else if (bindObj.element.hasAttribute("sd-rdo")) {
+                refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"), false, true);
+                if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
+                    bindObj.updater = function() {
+                        let value: any;
+                        Array.from(document.getElementsByName(bindObj.element.name)).some(function(
+                            rdoEl: HTMLInputElement
+                        ) {
+                            if (rdoEl.checked) {
+                                value = rdoEl.value;
+                                return true;
+                            }
+                        });
+                        refToUpdate[refToUpdate.$lastPart] = value;
+                    };
+                }
+            }
+            */
+        }
+    },
     proxies: {
         addHandler: function(directive: SimpleDirective) {
             // TODO
@@ -328,7 +455,7 @@ const simpleDirectives = {
                     break;
             }
             if (type === "on") {
-                simpleDirectives.tools.addEventListeners(directive);
+                simpleDirectives.events.addListeners(directive);
             } else {
                 simpleDirectives.proxies.addHandler(directive);
             }
@@ -410,137 +537,6 @@ const simpleDirectives = {
     },
     root: window,
     tools: {
-        addEventListeners: function(directive: SimpleDirective) {
-            // TODO
-            /*
-            if (references.indexOf("$update") !== -1) {
-                let attrValIndex: number;
-                let refToUpdate;
-                let indexToRemove: number;
-                while ((indexToRemove = references.indexOf("$update")) !== -1) {
-                    references.splice(indexToRemove, 1);
-                }
-                if (bindObj.element.hasAttribute("sd-attr")) {
-                    if (
-                        bindObj.element.tagName === "input" &&
-                        ["checkbox", "radio"].indexOf(bindObj.element.getAttribute("type")) !== -1
-                    ) {
-                        refToUpdate = bindObj.element.getAttribute("sd-attr");
-                        attrValIndex = refToUpdate.indexOf("checked");
-                        if (attrValIndex !== -1) {
-                            refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
-                            attrValIndex = refToUpdate.indexOf(";");
-                            if (attrValIndex !== -1) {
-                                refToUpdate = refToUpdate.substring(0, attrValIndex);
-                            }
-                            refToUpdate = getRef(refToUpdate, false, true);
-                            if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                                bindObj.updater = function() {
-                                    refToUpdate[refToUpdate.$lastPart] = bindObj.element.checked;
-                                };
-                            }
-                        }
-                    } else {
-                        refToUpdate = bindObj.element.getAttribute("sd-attr");
-                        attrValIndex = refToUpdate.indexOf("value");
-                        if (attrValIndex !== -1) {
-                            refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
-                            attrValIndex = refToUpdate.indexOf(";");
-                            if (attrValIndex !== -1) {
-                                refToUpdate = refToUpdate.substring(0, attrValIndex);
-                            }
-                            refToUpdate = getRef(refToUpdate, false, true);
-                            if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                                bindObj.updater = function() {
-                                    refToUpdate[refToUpdate.$lastPart] = bindObj.element.value;
-                                };
-                            }
-                        }
-                    }
-                } else if (bindObj.element.hasAttribute("sd-html") && bindObj.element.isContentEditable) {
-                    refToUpdate = getRef(bindObj.element.getAttribute("sd-html"), false, true);
-                    if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                        bindObj.updater = function() {
-                            refToUpdate[refToUpdate.$lastPart] = bindObj.element.innerHTML;
-                        };
-                    }
-                } else if (bindObj.element.hasAttribute("sd-rdo")) {
-                    refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"), false, true);
-                    if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                        bindObj.updater = function() {
-                            let value: any;
-                            Array.from(document.getElementsByName(bindObj.element.name)).some(function(
-                                rdoEl: HTMLInputElement
-                            ) {
-                                if (rdoEl.checked) {
-                                    value = rdoEl.value;
-                                    return true;
-                                }
-                            });
-                            refToUpdate[refToUpdate.$lastPart] = value;
-                        };
-                    }
-                }
-            }
-            if (references.length) {
-                bindObj.listener = function(event) {
-                    let getRefData: any = false;
-                    let callObject: any = {
-                        element: el,
-                        event
-                    };
-                    if (sdForContext) {
-                        getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
-                        callObject[sdForContext.itemName] = getRefData[sdForContext.itemName];
-                    }
-                    references.forEach(function(reference) {
-                        if (reference.indexOf("=") !== -1) {
-                            let refParts = reference.split("=");
-                            let leftRef = getRef(refParts[0], false, true);
-                            leftRef[leftRef.$lastPart] = getRef(refParts[1], getRefData);
-                        } else {
-                            getRef(reference, getRefData).apply(
-                                callObject,
-                                bindObj.refArgs.map(refArg => getRef(refArg, getRefData) || refArg)
-                            );
-                        }
-                    });
-                };
-            }
-            ~~~~~~~~~~~~
-            let toggleListener = bindObj.element.addEventListener;
-            if (bindObj.element.tagName === "input" && bindObj.element.getAttribute("type") === "radio") {
-                let elements: HTMLInputElement[] = Array.from(document.getElementsByName(bindObj.element.name));
-                toggleListener = function(eventName, fn) {
-                    elements.forEach(function(element) {
-                        element.addEventListener(eventName, fn);
-                    });
-                };
-            }
-            if (bindObj.eventName.indexOf(",") !== -1) {
-                bindObj.eventName.split(",").forEach(function(singleEventName) {
-                    if (bindObj.listener) {
-                        toggleListener(singleEventName, bindObj.listener);
-                    }
-                    if (bindObj.updater) {
-                        toggleListener(singleEventName, bindObj.updater);
-                    }
-                });
-            } else {
-                if (bindObj.listener) {
-                    toggleListener(bindObj.eventName, bindObj.listener);
-                }
-                if (bindObj.updater) {
-                    toggleListener(bindObj.eventName, bindObj.updater);
-                }
-            }
-            */
-            directive.listener = {
-                handleEvent: function(event: Event) {
-                    //
-                }
-            };
-        },
         removeNulls: function(arr: any[]) {
             let index: number;
             while ((index = arr.indexOf(null)) !== -1) {
