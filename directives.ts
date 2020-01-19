@@ -5,7 +5,7 @@ interface SimpleDirective {
     listener?: EventListenerObject;
     originalHTML?: string;
     preReferences?: string[];
-    proxyHandler?: Function;
+    proxyAction?: Function;
     references: string[];
     type: string;
 }
@@ -307,11 +307,11 @@ const simpleDirectives = {
         cache: {},
         removeHandler: function(directive: SimpleDirective) {
             directive.references.forEach(function(reference) {
-                simpleDirectives.proxies.cache[reference].map(function(proxyHandler: ProxyHandler<any>) {
-                    if (proxyHandler === directive.proxyHandler) {
+                simpleDirectives.proxies.cache[reference].map(function(action: Function) {
+                    if (action === directive.proxyAction) {
                         return null;
                     } else {
-                        return proxyHandler;
+                        return action;
                     }
                 });
                 simpleDirectives.tools.removeNulls(simpleDirectives.proxies.cache[reference]);
