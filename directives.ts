@@ -62,13 +62,6 @@ const simpleDirectives = {
         return response;
     },
     addEventListeners: function(directive: SimpleDirective): EventListenerObject {
-        // TODO
-        const listener: EventListenerObject = {
-            handleEvent: function(event: Event) {
-                // TODO
-            }
-        };
-        // TODO
         /*
         if (references.indexOf("$update") !== -1) {
             let attrValIndex: number;
@@ -192,6 +185,11 @@ const simpleDirectives = {
             }
         }
         */
+        const listener: EventListenerObject = {
+            handleEvent: function(event: Event) {
+                // TODO
+            }
+        };
         return listener;
     },
     comparison: function(comparator: string, reference: string, scope: object): SimpleReference {
