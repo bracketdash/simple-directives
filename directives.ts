@@ -113,8 +113,10 @@ const simpleDirectives = {
     },
     addEventListeners: function(element: HTMLElement, events: string[], references: string[]): EventListenerObject {
         // TODO
-        const listener = function(event: Event) {
-            // TODO
+        const listener: EventListenerObject = {
+            handleEvent: function(event: Event) {
+                // TODO
+            }
         };
         // TODO
         /*
@@ -240,9 +242,7 @@ const simpleDirectives = {
             }
         }
         */
-        return {
-            handleEvent: listener
-        };
+        return listener;
     },
     comparison: function(comparator: string, reference: string, scope: object): SimpleReference {
         const parts = reference.split(comparator);
