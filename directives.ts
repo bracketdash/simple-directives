@@ -10,131 +10,108 @@ interface SimpleDirective {
 interface SimpleReference {
     bang?: boolean;
     parent: object;
+    refArgs?: string[];
     target: string;
 }
 const simpleDirectives = {
-    add: function(element: HTMLElement, type: string, references: string[], preReferences?: string[]): any {
-        let directive: any = {};
+    add: function(element: HTMLElement, type: string, references: string[], preReferences?: string[]): boolean {
+        let directive: any = { element, type };
+        if (type === "rdo") {
+            let existingRdoFound = false;
+            this.registry.some(function(directive: SimpleDirective) {
+                if (directive.type === "rdo" && directive.element === element) {
+                    existingRdoFound = true;
+                    return true;
+                }
+            });
+            if (existingRdoFound) {
+                return false;
+            }
+        }
         if (type === "on") {
             directive.listener = this.addEventListeners(element, preReferences, references);
         }
-        // TODO
         /*
-        let isFalsyIf = false;
-        let isLoop = false;
-        if (!elCount) {
-            elCount = 1;
+        let attrParts = attrWhole.split(":");
+        // directives which do not have a value before the reference
+        if (["if", "html", "rdo"].indexOf(directiveName) !== -1) {
+            bindObj.reference = attrParts.shift();
+            if (attrParts.length) {
+                bindObj.refArgs = attrParts;
+            }
+        } else {
+            bindObj[propMap[directiveName]] = attrParts.shift();
+            bindObj.reference = attrParts.shift();
+            if (attrParts.length) {
+                bindObj.refArgs = attrParts;
+            }
         }
-        unregisterDirectives(el);
-        // all directives - if and for need to happen first
-        ["if", "for", "html", "attr", "rdo", "class", "on"].some(function(directiveName) {
-            const directiveValue = el.getAttribute("sd-" + directiveName).replace(/\s+/, "");
-            let toBind: any[];
-            if (!el.hasAttribute("sd-" + directiveName)) {
-                return false;
+        if (directiveName === "for") {
+            bindObj.originalHTML = el.innerHTML;
+        }
+        if (sdForContext) {
+            if (!bindObj.itemNames) {
+                bindObj.itemNames = [];
             }
-            if (directiveName === "rdo") {
-                let existingRdoFound = false;
-                binds.rdo.some(function(bindObj) {
-                    if (bindObj.element === el) {
-                        existingRdoFound = true;
-                        return true;
-                    }
-                });
-                if (existingRdoFound) {
-                    return false;
-                }
-            }
-            // directives which allow multiple definition sets
-            if (["attr", "class", "on"].indexOf(directiveName) !== -1 && directiveValue.indexOf(";") !== -1) {
-                toBind = directiveValue.split(";");
-            } else {
-                toBind = [directiveValue];
-            }
-            toBind.forEach(function(attrWhole) {
-                let bindObj: any = { element: el };
-                let attrParts = attrWhole.split(":");
-                // directives which do not have a value before the reference
-                if (["if", "html", "rdo"].indexOf(directiveName) !== -1) {
-                    bindObj.reference = attrParts.shift();
-                    if (attrParts.length) {
-                        bindObj.refArgs = attrParts;
-                    }
+            bindObj.itemNames.push(sdForContext.itemName);
+            if (Array.isArray(sdForContext.value)) {
+                if (typeof sdForContext.value[sdForIndex] === "object") {
+                    bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
                 } else {
-                    bindObj[propMap[directiveName]] = attrParts.shift();
-                    bindObj.reference = attrParts.shift();
-                    if (attrParts.length) {
-                        bindObj.refArgs = attrParts;
-                    }
+                    bindObj[sdForContext.itemName] = {
+                        value: sdForContext.value[sdForIndex]
+                    };
                 }
-                if (directiveName === "for") {
-                    bindObj.originalHTML = el.innerHTML;
+                bindObj[sdForContext.itemName].$key = sdForIndex;
+            } else {
+                let key = Object.keys(sdForContext.value)[sdForIndex];
+                if (typeof sdForContext.value[key] === "object") {
+                    bindObj[sdForContext.itemName] = sdForContext.value[key];
+                } else {
+                    bindObj[sdForContext.itemName] = {
+                        value: sdForContext.value[key]
+                    };
                 }
-                if (sdForContext) {
-                    if (!bindObj.itemNames) {
-                        bindObj.itemNames = [];
-                    }
-                    bindObj.itemNames.push(sdForContext.itemName);
-                    if (Array.isArray(sdForContext.value)) {
-                        if (typeof sdForContext.value[sdForIndex] === "object") {
-                            bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
-                        } else {
-                            bindObj[sdForContext.itemName] = {
-                                value: sdForContext.value[sdForIndex]
-                            };
-                        }
-                        bindObj[sdForContext.itemName].$key = sdForIndex;
-                    } else {
-                        let key = Object.keys(sdForContext.value)[sdForIndex];
-                        if (typeof sdForContext.value[key] === "object") {
-                            bindObj[sdForContext.itemName] = sdForContext.value[key];
-                        } else {
-                            bindObj[sdForContext.itemName] = {
-                                value: sdForContext.value[key]
-                            };
-                        }
-                        bindObj[sdForContext.itemName].$key = key;
-                    }
-                    bindObj[sdForContext.itemName].$collection = sdForContext.value;
-                    bindObj[sdForContext.itemName].$index = sdForIndex;
-                }
-                binds[directiveName].push(bindObj);
-                if (directiveName === "if") {
-                    if (sdForContext) {
-                        let getRefData = {};
-                        getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
-                        bindObj.value = getRef(bindObj.reference, getRefData);
-                    } else {
-                        bindObj.value = getRef(bindObj.reference);
-                    }
-                    if (!bindObj.value) {
-                        el.style.display = "none";
-                        isFalsyIf = true;
-                        return true;
-                    } else {
-                        el.style.display = null;
-                    }
-                } else if (directiveName === "for") {
-                    isLoop = true;
-                }
-            });
-        });
-        if (isFalsyIf) {
-            return;
+                bindObj[sdForContext.itemName].$key = key;
+            }
+            bindObj[sdForContext.itemName].$collection = sdForContext.value;
+            bindObj[sdForContext.itemName].$index = sdForIndex;
         }
-        if (!isLoop) {
-            elCount += el.children.length;
-            Array.from(el.children).forEach(function(child) {
-                registerDirectives(child);
-            });
-        }
-        elCount -= 1;
-        if (!elCount && !runBindsRunning) {
-            runBinds();
+        binds[directiveName].push(bindObj);
+        if (directiveName === "if") {
+            if (sdForContext) {
+                let getRefData = {};
+                getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
+                bindObj.value = getRef(bindObj.reference, getRefData);
+            } else {
+                bindObj.value = getRef(bindObj.reference);
+            }
+            if (!bindObj.value) {
+                el.style.display = "none";
+                isFalsyIf = true;
+                return true;
+            } else {
+                el.style.display = null;
+            }
+        } else if (directiveName === "for") {
+            isLoop = true;
         }
         */
+        // TODO: the rest of `add`
+        if (type === "if") {
+            // TODO: get the scope
+            const response = this.reference(references[0], {
+                /* scope */
+            });
+            if (response.bang) {
+                return !response.parent[response.target];
+            } else {
+                return !!response.parent[response.target];
+            }
+        }
+        return true;
     },
-    addEventListeners: function(element: HTMLElement, preReferences: string[], references: string[]): EventListenerObject {
+    addEventListeners: function(element: HTMLElement, events: string[], references: string[]): EventListenerObject {
         // TODO
         const listener = function(event: Event) {
             // TODO
@@ -329,10 +306,13 @@ const simpleDirectives = {
             target: "value"
         };
         const hasBrackets = reference.indexOf("[") !== -1;
-        let hasDots = reference.indexOf(".") !== -1;
         let bang = false;
+        let hasDots: boolean;
         let parent: object;
+        let refArgs = reference.split(":");
         let target: string;
+        reference = refArgs.shift();
+        hasDots = reference.indexOf(".") !== -1;
         if (/[=<!>]/.test(reference)) {
             if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
                 reference = reference.substring(1);
@@ -379,22 +359,42 @@ const simpleDirectives = {
                 });
             }
         }
-        return { bang, parent, target };
+        return { bang, parent, target, refArgs };
     },
     refreshRate: 100,
-    register: function(element: HTMLElement) {
+    register: function(element: HTMLElement, skipUnregister?: boolean) {
         let directiveName: string;
         let expressions: string[];
         let skipChildren = false;
+        if (!this.running) {
+            this.runner();
+        }
+        if (!skipUnregister) {
+            this.unregister(element);
+        }
         ["if", "attr", "class", "for", "html", "on", "rdo"].some(function(type: string) {
+            let value: boolean;
             directiveName = `sd-${type}`;
             if (element.hasAttribute(directiveName)) {
-                expressions = element.getAttribute(directiveName).split(";");
+                expressions = element
+                    .getAttribute(directiveName)
+                    .replace(/\s+/, "")
+                    .split(";");
             } else {
                 return false;
             }
+            if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
+                expressions.forEach(function(expression: string) {
+                    const parts = expression.split(":");
+                    const preReferences = parts.shift().split(",");
+                    const references = parts.join(":").split(",");
+                    simpleDirectives.add(element, type, references, preReferences);
+                });
+            } else {
+                value = simpleDirectives.add(element, type, [expressions[0]]);
+            }
             if (type === "if") {
-                if (simpleDirectives.add(element, type, expressions)) {
+                if (value === false) {
                     element.style.display = "none";
                     return true;
                 } else {
@@ -404,19 +404,9 @@ const simpleDirectives = {
             if (type === "for") {
                 skipChildren = true;
             }
-            if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
-                expressions.forEach(function(expression: string) {
-                    const [references, preReferences] = expression.split(":");
-                    simpleDirectives.add(element, type, references.split(","), preReferences.split(","));
-                });
-            } else {
-                expressions.forEach(function(expression: string) {
-                    simpleDirectives.add(element, type, [expression]);
-                });
-            }
         });
         if (!skipChildren) {
-            Array.from(element.children).forEach(child => this.register(child));
+            Array.from(element.children).forEach(child => this.register(child, true));
         }
     },
     registry: [],
@@ -428,6 +418,9 @@ const simpleDirectives = {
     },
     root: window,
     runner: function() {
+        if (!this.running) {
+            this.running = true;
+        }
         this.registry.forEach(function(directive: SimpleDirective) {
             if (directive.type !== "on") {
                 this.run(directive);
@@ -435,8 +428,8 @@ const simpleDirectives = {
         });
         setTimeout(this.runner, this.refreshRate);
     },
+    running: false,
     run: function(directive: SimpleDirective) {
-        // TODO
         /*
         let indexToRemove: number;
         if (!runBindsRunning) {
@@ -577,7 +570,6 @@ const simpleDirectives = {
                 }
             }
         });
-        setTimeout(runBinds, simpleDirectives.refreshRate);
         */
     },
     unregister: function(parentElement: HTMLElement) {

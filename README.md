@@ -27,7 +27,7 @@ Notes on vocabulary:
 -   "Expression" refers to a custom syntax.
 -   "Reference" is a dot and bracket reference.
     -   Don't add parentheses to function references.
-    -   Reassign `simpleDirectives.root` to any object.
+    -   Optionally re-assign `simpleDirectives.root` to any object.
     -   References inside brackets should evaluate to a string or number.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
@@ -176,3 +176,5 @@ If the argument is not a valid reference, it will be passed as a string.
 If you intend to pass a string as the argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
+
+Arguments cannot be added to comparison or assignment expressions.
