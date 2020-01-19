@@ -14,104 +14,54 @@ interface SimpleReference {
     target: string;
 }
 const simpleDirectives = {
-    add: function(element: HTMLElement, type: string, references: string[], preReferences?: string[]): boolean {
-        let directive: any = { element, type };
-        if (type === "rdo") {
-            let existingRdoFound = false;
-            this.registry.some(function(directive: SimpleDirective) {
-                if (directive.type === "rdo" && directive.element === element) {
-                    existingRdoFound = true;
-                    return true;
-                }
-            });
-            if (existingRdoFound) {
-                return false;
-            }
+    add: function(
+        element: HTMLElement,
+        type: string,
+        references: string[],
+        preReferences?: string[],
+        scope?: object
+    ): boolean {
+        let directive: any = { element, type, references };
+        let existingRdoFound = false;
+        let response = true;
+        let simpleReference: SimpleReference;
+        if (scope) {
+            Object.assign(directive, scope);
         }
-        if (type === "on") {
-            directive.listener = this.addEventListeners(element, preReferences, references);
+        if (preReferences) {
+            directive.preReferences = preReferences;
         }
-        /*
-        let attrParts = attrWhole.split(":");
-        // directives which do not have a value before the reference
-        if (["if", "html", "rdo"].indexOf(directiveName) !== -1) {
-            bindObj.reference = attrParts.shift();
-            if (attrParts.length) {
-                bindObj.refArgs = attrParts;
-            }
-        } else {
-            bindObj[propMap[directiveName]] = attrParts.shift();
-            bindObj.reference = attrParts.shift();
-            if (attrParts.length) {
-                bindObj.refArgs = attrParts;
-            }
-        }
-        if (directiveName === "for") {
-            bindObj.originalHTML = el.innerHTML;
-        }
-        if (sdForContext) {
-            if (!bindObj.itemNames) {
-                bindObj.itemNames = [];
-            }
-            bindObj.itemNames.push(sdForContext.itemName);
-            if (Array.isArray(sdForContext.value)) {
-                if (typeof sdForContext.value[sdForIndex] === "object") {
-                    bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
+        switch (type) {
+            case "for":
+                directive.originalHTML = element.innerHTML;
+                break;
+            case "if":
+                simpleReference = this.reference(references[0], scope);
+                if (simpleReference.bang) {
+                    response = !simpleReference.parent[simpleReference.target];
                 } else {
-                    bindObj[sdForContext.itemName] = {
-                        value: sdForContext.value[sdForIndex]
-                    };
+                    response = !!simpleReference.parent[simpleReference.target];
                 }
-                bindObj[sdForContext.itemName].$key = sdForIndex;
-            } else {
-                let key = Object.keys(sdForContext.value)[sdForIndex];
-                if (typeof sdForContext.value[key] === "object") {
-                    bindObj[sdForContext.itemName] = sdForContext.value[key];
-                } else {
-                    bindObj[sdForContext.itemName] = {
-                        value: sdForContext.value[key]
-                    };
-                }
-                bindObj[sdForContext.itemName].$key = key;
-            }
-            bindObj[sdForContext.itemName].$collection = sdForContext.value;
-            bindObj[sdForContext.itemName].$index = sdForIndex;
+                break;
+            case "on":
+                directive.listener = this.addEventListeners(directive);
+                break;
+            case "rdo":
+                this.registry.some(function(directive: SimpleDirective) {
+                    if (directive.type === "rdo" && directive.element === element) {
+                        existingRdoFound = true;
+                    }
+                });
+                break;
+            default:
+                break;
         }
-        binds[directiveName].push(bindObj);
-        if (directiveName === "if") {
-            if (sdForContext) {
-                let getRefData = {};
-                getRefData[sdForContext.itemName] = bindObj[sdForContext.itemName];
-                bindObj.value = getRef(bindObj.reference, getRefData);
-            } else {
-                bindObj.value = getRef(bindObj.reference);
-            }
-            if (!bindObj.value) {
-                el.style.display = "none";
-                isFalsyIf = true;
-                return true;
-            } else {
-                el.style.display = null;
-            }
-        } else if (directiveName === "for") {
-            isLoop = true;
+        if (!existingRdoFound) {
+            this.registry.push(directive);
         }
-        */
-        // TODO: the rest of `add`
-        if (type === "if") {
-            // TODO: get the scope
-            const response = this.reference(references[0], {
-                /* scope */
-            });
-            if (response.bang) {
-                return !response.parent[response.target];
-            } else {
-                return !!response.parent[response.target];
-            }
-        }
-        return true;
+        return response;
     },
-    addEventListeners: function(element: HTMLElement, events: string[], references: string[]): EventListenerObject {
+    addEventListeners: function(directive: SimpleDirective): EventListenerObject {
         // TODO
         const listener: EventListenerObject = {
             handleEvent: function(event: Event) {
@@ -362,7 +312,7 @@ const simpleDirectives = {
         return { bang, parent, target, refArgs };
     },
     refreshRate: 100,
-    register: function(element: HTMLElement, skipUnregister?: boolean) {
+    register: function(element: HTMLElement, skipUnregister?: boolean, scope?: object) {
         let directiveName: string;
         let expressions: string[];
         let skipChildren = false;
@@ -388,20 +338,26 @@ const simpleDirectives = {
                     const parts = expression.split(":");
                     const preReferences = parts.shift().split(",");
                     const references = parts.join(":").split(",");
-                    simpleDirectives.add(element, type, references, preReferences);
+                    if (scope) {
+                        simpleDirectives.add(element, type, references, preReferences, scope);
+                    } else {
+                        simpleDirectives.add(element, type, references, preReferences);
+                    }
                 });
+            } else if (scope) {
+                value = simpleDirectives.add(element, type, [expressions[0]], [], scope);
             } else {
                 value = simpleDirectives.add(element, type, [expressions[0]]);
             }
             if (type === "if") {
                 if (value === false) {
                     element.style.display = "none";
+                    skipChildren = true;
                     return true;
                 } else {
                     return false;
                 }
-            }
-            if (type === "for") {
+            } else if (type === "for") {
                 skipChildren = true;
             }
         });
@@ -430,6 +386,30 @@ const simpleDirectives = {
     },
     running: false,
     run: function(directive: SimpleDirective) {
+        /* TODO: set up $context, $index, and $key in run()
+        if (Array.isArray(sdForContext.value)) {
+            if (typeof sdForContext.value[sdForIndex] === "object") {
+                bindObj[sdForContext.itemName] = sdForContext.value[sdForIndex];
+            } else {
+                bindObj[sdForContext.itemName] = {
+                    value: sdForContext.value[sdForIndex]
+                };
+            }
+            bindObj[sdForContext.itemName].$key = sdForIndex;
+        } else {
+            let key = Object.keys(sdForContext.value)[sdForIndex];
+            if (typeof sdForContext.value[key] === "object") {
+                bindObj[sdForContext.itemName] = sdForContext.value[key];
+            } else {
+                bindObj[sdForContext.itemName] = {
+                    value: sdForContext.value[key]
+                };
+            }
+            bindObj[sdForContext.itemName].$key = key;
+        }
+        bindObj[sdForContext.itemName].$collection = sdForContext.value;
+        bindObj[sdForContext.itemName].$index = sdForIndex;
+        */
         /*
         let indexToRemove: number;
         if (!runBindsRunning) {
