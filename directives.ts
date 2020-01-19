@@ -304,9 +304,18 @@ const simpleDirectives = {
             });
             */
         },
-        cache: [],
+        cache: {},
         removeHandler: function(directive: SimpleDirective) {
-            // TODO
+            directive.references.forEach(function(reference) {
+                simpleDirectives.proxies.cache[reference].map(function(proxyHandler: ProxyHandler<any>) {
+                    if (proxyHandler === directive.proxyHandler) {
+                        return null;
+                    } else {
+                        return proxyHandler;
+                    }
+                });
+                simpleDirectives.tools.removeNulls(simpleDirectives.proxies.cache[reference]);
+            });
         }
     },
     references: {
