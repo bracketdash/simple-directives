@@ -1,7 +1,7 @@
 // A Simple Directives Library
 // https://github.com/bracketdash/simple-directives/blob/master/README.md
 interface RevocableProxy {
-    proxy: any,
+    proxy: any;
     revoke: Function;
 }
 interface SimpleDirective {
@@ -79,77 +79,49 @@ const simpleDirectives = {
             return action;
         },
         getUpdater: function(directive: SimpleDirective): Function {
-            // TODO
-            return function() {};
-            /*
-            let attrValIndex: number;
-            let refToUpdate;
-            let indexToRemove: number;
-            while ((indexToRemove = references.indexOf("$update")) !== -1) {
-                references.splice(indexToRemove, 1);
-            }
-            if (bindObj.element.hasAttribute("sd-attr")) {
-                if (
-                    bindObj.element.tagName === "input" &&
-                    ["checkbox", "radio"].indexOf(bindObj.element.getAttribute("type")) !== -1
-                ) {
-                    refToUpdate = bindObj.element.getAttribute("sd-attr");
-                    attrValIndex = refToUpdate.indexOf("checked");
-                    if (attrValIndex !== -1) {
-                        refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
-                        attrValIndex = refToUpdate.indexOf(";");
-                        if (attrValIndex !== -1) {
-                            refToUpdate = refToUpdate.substring(0, attrValIndex);
-                        }
-                        refToUpdate = getRef(refToUpdate, false, true);
-                        if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                            bindObj.updater = function() {
-                                refToUpdate[refToUpdate.$lastPart] = bindObj.element.checked;
-                            };
-                        }
-                    }
-                } else {
-                    refToUpdate = bindObj.element.getAttribute("sd-attr");
-                    attrValIndex = refToUpdate.indexOf("value");
-                    if (attrValIndex !== -1) {
-                        refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
-                        attrValIndex = refToUpdate.indexOf(";");
-                        if (attrValIndex !== -1) {
-                            refToUpdate = refToUpdate.substring(0, attrValIndex);
-                        }
-                        refToUpdate = getRef(refToUpdate, false, true);
-                        if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                            bindObj.updater = function() {
-                                refToUpdate[refToUpdate.$lastPart] = bindObj.element.value;
-                            };
-                        }
-                    }
+            let { element } = directive;
+            let refToUpdate: any;
+            let updater: Function;
+            if (element.hasAttribute("sd-attr")) {
+                let attrValIndex: number;
+                let attr = "value";
+                refToUpdate = element.getAttribute("sd-attr");
+                if (element.tagName === "input" && ["checkbox", "radio"].indexOf(element.getAttribute("type")) !== -1) {
+                    attr = "checked";
                 }
-            } else if (bindObj.element.hasAttribute("sd-html") && bindObj.element.isContentEditable) {
-                refToUpdate = getRef(bindObj.element.getAttribute("sd-html"), false, true);
-                if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                    bindObj.updater = function() {
-                        refToUpdate[refToUpdate.$lastPart] = bindObj.element.innerHTML;
+                attrValIndex = refToUpdate.indexOf(attr);
+                if (attrValIndex !== -1) {
+                    refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
+                    attrValIndex = refToUpdate.indexOf(";");
+                    if (attrValIndex !== -1) {
+                        refToUpdate = refToUpdate.substring(0, attrValIndex);
+                    }
+                    refToUpdate = simpleDirectives.references.convert(refToUpdate, directive);
+                    updater = function() {
+                        refToUpdate.parent[refToUpdate.target] = element[attr];
                     };
                 }
-            } else if (bindObj.element.hasAttribute("sd-rdo")) {
-                refToUpdate = getRef(bindObj.element.getAttribute("sd-rdo"), false, true);
-                if (typeof refToUpdate[refToUpdate.$lastPart] !== "function") {
-                    bindObj.updater = function() {
-                        let value: any;
-                        Array.from(document.getElementsByName(bindObj.element.name)).some(function(
-                            rdoEl: HTMLInputElement
-                        ) {
-                            if (rdoEl.checked) {
-                                value = rdoEl.value;
-                                return true;
-                            }
-                        });
-                        refToUpdate[refToUpdate.$lastPart] = value;
-                    };
-                }
+            } else if (element.hasAttribute("sd-html") && element.isContentEditable) {
+                refToUpdate = simpleDirectives.references.convert(element.getAttribute("sd-html"), directive);
+                updater = function() {
+                    refToUpdate.parent[refToUpdate.target] = element.innerHTML;
+                };
+            } else if (element.hasAttribute("sd-rdo")) {
+                refToUpdate = simpleDirectives.references.convert(element.getAttribute("sd-rdo"), directive);
+                updater = function() {
+                    let value: any;
+                    Array.from(document.getElementsByName(element.getAttribute("name"))).some(function(
+                        el: HTMLInputElement
+                    ) {
+                        if (el.checked) {
+                            value = el.value;
+                            return true;
+                        }
+                    });
+                    refToUpdate.parent[refToUpdate.target] = value;
+                };
             }
-            */
+            return updater;
         }
     },
     proxies: {
