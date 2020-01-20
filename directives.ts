@@ -126,162 +126,179 @@ const simpleDirectives = {
     },
     proxies: {
         addAction: function(directive: SimpleDirective) {
-            // TODO
-            // check if reference exists in this.proxies first - if so, just add more to the same proxy handler
-            // check out why Vue.delete and Vue.set are needed; we probably need the same thing
-            // `sd-for` needs to be deep-proxied, btw (array of objects)
-            // other references should evaluate to simple values
-            // don't forget about comparisons -- will need to proxy to both sub-references
-            // if it's not an `sd-for` but the reference is to an object, proxy for truthy or falsy changes only
-            /*
-            const preReferenceMap = {
-                attr: "attributeName",
-                class: "className",
-                for: "itemName",
-                on: "eventName"
-            };
-            let indexToRemove: number;
-            if (!runBindsRunning) {
-                runBindsRunning = true;
+            const { references, type } = directive;
+            const reference = references[0];
+            let action: Function;
+            // TODO: make sure comparisons are handled correctly
+            if (!simpleDirectives.proxies.cache[reference]) {
+                simpleDirectives.proxies.createRevocable(reference, directive);
             }
-            // bind directives (i.e. everything except sd-on) - if and for need to be first
-            ["if", "for", "html", "attr", "rdo", "class"].forEach(function(directiveName) {
-                binds[directiveName].forEach(function(bindObj, bindIndex) {
-                    if (!bindObj.element.parentElement) {
-                        binds[directiveName][bindIndex] = false;
-                        return;
-                    }
-                    let callObject: any = {
-                        element: bindObj.element
-                    };
-                    let value: any;
-                    switch (directiveName) {
-                        case "attr":
-                            callObject.attributeName = bindObj.attributeName;
-                            break;
-                        case "class":
-                            callObject.className = bindObj.className;
-                            break;
-                        case "for":
-                            callObject.itemName = bindObj.itemName;
-                            break;
-                        default:
-                            break;
-                    }
-                    if (bindObj.itemNames) {
-                        let getRefData = {};
-                        bindObj.itemNames.forEach(function(itemName) {
-                            getRefData[itemName] = bindObj[itemName];
-                            callObject[itemName] = getRefData[itemName];
-                        });
-                        value = getRef(bindObj.reference, getRefData);
-                    } else {
-                        value = getRef(bindObj.reference);
-                    }
-                    if (typeof value === "function") {
-                        value = value.apply(
-                            callObject,
-                            bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
-                        );
-                    }
-                    // directives that only accept booleans
-                    if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
-                        value = !!value;
-                    }
-                    // if value hasn't changed, skip the rest of this bind run
-                    if (bindObj.value && bindObj.value === value) {
-                        return;
-                    }
-                    if (directiveName === "for") {
-                        value = bindObj.originalHTML.repeat(
-                            Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length
-                        );
-                    }
-                    bindObj.value = value;
-                    switch (directiveName) {
-                        case "if":
-                            if (value) {
-                                bindObj.element.style.display = null;
-                                registerDirectives(bindObj.element);
-                            } else {
-                                bindObj.element.style.display = "none";
-                                unregisterDirectives(bindObj.element, "if");
-                            }
-                            break;
-                        case "for":
-                        case "html":
-                            Array.from(bindObj.element.children).forEach(function(child) {
-                                unregisterDirectives(child);
+            action = function() {
+                // TODO
+                /*
+                let indexToRemove: number;
+                if (!runBindsRunning) {
+                    runBindsRunning = true;
+                }
+                // bind directives (i.e. everything except sd-on) - if and for need to be first
+                ["if", "for", "html", "attr", "rdo", "class"].forEach(function(directiveName) {
+                    binds[directiveName].forEach(function(bindObj, bindIndex) {
+                        if (!bindObj.element.parentElement) {
+                            binds[directiveName][bindIndex] = false;
+                            return;
+                        }
+                        let callObject: any = {
+                            element: bindObj.element
+                        };
+                        let value: any;
+                        switch (directiveName) {
+                            case "attr":
+                                callObject.attributeName = bindObj.attributeName;
+                                break;
+                            case "class":
+                                callObject.className = bindObj.className;
+                                break;
+                            case "for":
+                                callObject.itemName = bindObj.itemName;
+                                break;
+                            default:
+                                break;
+                        }
+                        if (bindObj.itemNames) {
+                            let getRefData = {};
+                            bindObj.itemNames.forEach(function(itemName) {
+                                getRefData[itemName] = bindObj[itemName];
+                                callObject[itemName] = getRefData[itemName];
                             });
-                            bindObj.element.innerHTML = value;
-                            Array.from(bindObj.element.children).forEach(function(child, index) {
-                                if (directiveName === "for") {
-                                    registerDirectives(child, bindObj, index);
+                            value = getRef(bindObj.reference, getRefData);
+                        } else {
+                            value = getRef(bindObj.reference);
+                        }
+                        if (typeof value === "function") {
+                            value = value.apply(
+                                callObject,
+                                bindObj.refArgs.map(refArg => getRef(refArg) || refArg)
+                            );
+                        }
+                        // directives that only accept booleans
+                        if (["if", "class"].indexOf(directiveName) !== -1 && typeof value !== "boolean") {
+                            value = !!value;
+                        }
+                        // if value hasn't changed, skip the rest of this bind run
+                        if (bindObj.value && bindObj.value === value) {
+                            return;
+                        }
+                        if (directiveName === "for") {
+                            value = bindObj.originalHTML.repeat(
+                                Array.isArray(bindObj.value) ? bindObj.value.length : Object.keys(bindObj.value).length
+                            );
+                        }
+                        bindObj.value = value;
+                        switch (directiveName) {
+                            case "if":
+                                if (value) {
+                                    bindObj.element.style.display = null;
+                                    registerDirectives(bindObj.element);
                                 } else {
-                                    registerDirectives(child);
+                                    bindObj.element.style.display = "none";
+                                    unregisterDirectives(bindObj.element, "if");
                                 }
-                            });
-                            break;
-                        case "attr":
-                            if (bindObj.attributeName.indexOf(",") !== -1) {
-                                bindObj.attributeName.split(",").forEach(function(singleAttributeName) {
-                                    if (typeof value === "undefined") {
-                                        if (bindObj.element.hasAttribute(singleAttributeName)) {
-                                            bindObj.element.removeAttribute(singleAttributeName);
-                                        }
+                                break;
+                            case "for":
+                            case "html":
+                                Array.from(bindObj.element.children).forEach(function(child) {
+                                    unregisterDirectives(child);
+                                });
+                                bindObj.element.innerHTML = value;
+                                Array.from(bindObj.element.children).forEach(function(child, index) {
+                                    if (directiveName === "for") {
+                                        registerDirectives(child, bindObj, index);
                                     } else {
-                                        bindObj.element.setAttribute(singleAttributeName, value);
+                                        registerDirectives(child);
                                     }
                                 });
-                            } else if (typeof value === "undefined") {
-                                if (bindObj.element.hasAttribute(bindObj.attributeName)) {
-                                    bindObj.element.removeAttribute(bindObj.attributeName);
-                                }
-                            } else {
-                                bindObj.element.setAttribute(bindObj.attributeName, value);
-                            }
-                            break;
-                        case "rdo":
-                            Array.from(document.getElementsByName(bindObj.element.name)).forEach(function(
-                                rdoEl: HTMLInputElement
-                            ) {
-                                if (rdoEl.value === value) {
-                                    rdoEl.checked = true;
-                                } else {
-                                    rdoEl.checked = false;
-                                }
-                            });
-                            break;
-                        case "class":
-                            if (bindObj.className.indexOf(",") !== -1) {
-                                bindObj.className.split(",").forEach(function(singleClassName) {
-                                    if (!value) {
-                                        if (bindObj.element.classList.contains(singleClassName)) {
-                                            bindObj.element.classList.remove(singleClassName);
+                                break;
+                            case "attr":
+                                if (bindObj.attributeName.indexOf(",") !== -1) {
+                                    bindObj.attributeName.split(",").forEach(function(singleAttributeName) {
+                                        if (typeof value === "undefined") {
+                                            if (bindObj.element.hasAttribute(singleAttributeName)) {
+                                                bindObj.element.removeAttribute(singleAttributeName);
+                                            }
+                                        } else {
+                                            bindObj.element.setAttribute(singleAttributeName, value);
                                         }
-                                    } else if (!bindObj.element.classList.contains(singleClassName)) {
-                                        bindObj.element.classList.add(singleClassName);
+                                    });
+                                } else if (typeof value === "undefined") {
+                                    if (bindObj.element.hasAttribute(bindObj.attributeName)) {
+                                        bindObj.element.removeAttribute(bindObj.attributeName);
+                                    }
+                                } else {
+                                    bindObj.element.setAttribute(bindObj.attributeName, value);
+                                }
+                                break;
+                            case "rdo":
+                                Array.from(document.getElementsByName(bindObj.element.name)).forEach(function(
+                                    rdoEl: HTMLInputElement
+                                ) {
+                                    if (rdoEl.value === value) {
+                                        rdoEl.checked = true;
+                                    } else {
+                                        rdoEl.checked = false;
                                     }
                                 });
-                            } else if (!value) {
-                                if (bindObj.element.classList.contains(bindObj.className)) {
-                                    bindObj.element.classList.remove(bindObj.className);
+                                break;
+                            case "class":
+                                if (bindObj.className.indexOf(",") !== -1) {
+                                    bindObj.className.split(",").forEach(function(singleClassName) {
+                                        if (!value) {
+                                            if (bindObj.element.classList.contains(singleClassName)) {
+                                                bindObj.element.classList.remove(singleClassName);
+                                            }
+                                        } else if (!bindObj.element.classList.contains(singleClassName)) {
+                                            bindObj.element.classList.add(singleClassName);
+                                        }
+                                    });
+                                } else if (!value) {
+                                    if (bindObj.element.classList.contains(bindObj.className)) {
+                                        bindObj.element.classList.remove(bindObj.className);
+                                    }
+                                } else if (!bindObj.element.classList.contains(bindObj.className)) {
+                                    bindObj.element.classList.add(bindObj.className);
                                 }
-                            } else if (!bindObj.element.classList.contains(bindObj.className)) {
-                                bindObj.element.classList.add(bindObj.className);
-                            }
-                            break;
+                                break;
+                        }
+                    });
+                    if (binds[directiveName].indexOf(false) !== -1) {
+                        while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
+                            binds[directiveName].splice(indexToRemove, 1);
+                        }
                     }
                 });
-                if (binds[directiveName].indexOf(false) !== -1) {
-                    while ((indexToRemove = binds[directiveName].indexOf(false)) !== -1) {
-                        binds[directiveName].splice(indexToRemove, 1);
-                    }
-                }
-            });
-            */
+                */
+            };
+            directive.proxyAction = action;
+            simpleDirectives.proxies.cache[reference].push(action);
         },
         cache: {},
+        createRevocable: function(reference: string, directive: SimpleDirective) {
+            const value = simpleDirectives.references.convert(reference, directive);
+            simpleDirectives.proxies.cache[reference] = [];
+            // TODO: if directive.type === "for", set up nested proxies for watching a whole collection
+            // TODO: if reference is a comparison (contains one of the comparators), set up proxies for both sides that fire the same handler
+            // TODO: if it's not an `sd-for` but the reference is to an object, proxy for boolean casts (truthy or falsy) changes only
+            directive.proxyRef = Proxy.revocable(value.parent, {
+                set: function(_, prop, value) {
+                    if (prop === value.target) {
+                        simpleDirectives.proxies.cache[reference].forEach(function(action: Function) {
+                            action(directive);
+                        });
+                    }
+                    return value;
+                }
+            });
+            value.parent = directive.proxyRef.proxy;
+        },
         removeAction: function(directive: SimpleDirective) {
             directive.references.forEach(function(reference) {
                 simpleDirectives.proxies.cache[reference].map(function(action: Function) {
@@ -293,6 +310,7 @@ const simpleDirectives = {
                 });
                 simpleDirectives.tools.removeNulls(simpleDirectives.proxies.cache[reference]);
                 if (!simpleDirectives.proxies.cache[reference].length) {
+                    // TODO: handle nested loops, comparisons, and boolean casts correctly
                     directive.proxyRef.revoke();
                     delete simpleDirectives.proxies.cache[reference];
                 }
@@ -420,6 +438,12 @@ const simpleDirectives = {
             preReferences?: string[],
             scope?: object
         ): boolean {
+            const preReferenceMap = {
+                attr: "attributeName",
+                class: "className",
+                for: "itemName",
+                on: "eventName"
+            };
             let directive: SimpleDirective = { element, type, references };
             let existingRdoFound = false;
             let response = true;
@@ -429,6 +453,9 @@ const simpleDirectives = {
             }
             if (preReferences) {
                 directive.preReferences = preReferences;
+                if (preReferenceMap[type]) {
+                    directive[preReferenceMap[type]] = preReferences;
+                }
             }
             switch (type) {
                 case "for":
