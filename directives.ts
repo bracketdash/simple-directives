@@ -141,9 +141,27 @@ const simpleDirectives = {
             const action = simpleDirectives.tools.createAction(directive, args);
             directive.proxyAction = action;
             simpleDirectives.proxies.cache[reference].push(action);
+            let value = simpleDirectives.references.convert(reference, directive);
+            let lastValue: any;
+            if (typeof value.parent[value.target] === "function") {
+                args = args.map(function(arg) {
+                    const argVal = simpleDirectives.references.convert(arg, directive);
+                    return argVal.parent[argVal.target];
+                });
+                lastValue = value.parent[value.target].apply(directive, args);
+            }
+            if (value.bang) {
+                lastValue = !lastValue;
+            }
+            action(lastValue);
         },
         cache: {},
         createRevocable: function(reference: string, directive: SimpleDirective) {
+            // TODO: BUG -- these proxies aren't firing when expected
+            // TODO: it's because the original object !== value.parent by the end
+            // TODO: go through and make sure all references are triple-equal with the original data that should be
+            // TODO: we may end up removing proxies because of this..but then we need to make sure watchers.runner() is SUPER LIGHT + FAST (should be fun)
+            // TODO: WAIT! What if we had 2 "real references"? One that we use for registering proxies and another for adding scope?
             const value = simpleDirectives.references.convert(reference, directive);
             simpleDirectives.proxies.cache[reference] = [];
             directive.proxyRef = Proxy.revocable(value.parent, {
@@ -345,7 +363,7 @@ const simpleDirectives = {
                 if (
                     type === "for" ||
                     /[=<!>]/.test(reference.substring(1)) ||
-                    ["string", "number"].indexOf(typeof value.parent[value.target]) !== -1
+                    ["string", "number", "boolean"].indexOf(typeof value.parent[value.target]) !== -1
                 ) {
                     simpleDirectives.watchers.addAction(directive);
                 } else {
@@ -405,9 +423,9 @@ const simpleDirectives = {
                 }
             });
             if (!skipChildren) {
-                Array.from(element.children).forEach((child: HTMLElement) =>
-                    simpleDirectives.registry.register(child, true)
-                );
+                Array.from(element.children).forEach(function(child: HTMLElement) {
+                    simpleDirectives.registry.register(child, true);
+                });
             }
         },
         unregister: function(parentElement: HTMLElement) {
@@ -549,7 +567,7 @@ const simpleDirectives = {
     watchers: {
         addAction: function(directive: SimpleDirective) {
             let args: any = directive.references[0].split(":");
-            args.shift();
+            const reference = args.shift();
             const action = simpleDirectives.tools.createAction(directive, args);
             directive.watcherAction = action;
             simpleDirectives.watchers.cache.push({
@@ -578,10 +596,19 @@ const simpleDirectives = {
             }
             simpleDirectives.watchers.cache.forEach(function(simpleAction: SimpleAction) {
                 const { action, directive, lastValue } = simpleAction;
-                const value = simpleDirectives.references.convert(directive.references[0], directive);
-                if (value.parent[value.target] != lastValue) {
-                    simpleAction.lastValue = value.parent[value.target];
-                    action(value.parent[value.target]);
+                const args = directive.references[0].split(":");
+                const reference = args.shift();
+                const value = simpleDirectives.references.convert(reference, directive);
+                let newValue = value.parent[value.target];
+                if (typeof newValue === "function") {
+                    newValue = newValue.apply(directive, args);
+                }
+                if (value.bang) {
+                    newValue = !newValue;
+                }
+                if (newValue != lastValue) {
+                    simpleAction.lastValue = newValue;
+                    action(newValue);
                 }
             });
             setTimeout(simpleDirectives.watchers.runner, 250);
