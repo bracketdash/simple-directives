@@ -40,7 +40,7 @@ interface SimpleAction {
 
     /*
      * DIRECTIVE REGISTRATION
-     */
+     * * * * * * * * * * * * */
 
     function register(element: HTMLElement, skipUnregister?: boolean, scope?: object) {
         let attributeValue: string;
@@ -165,7 +165,7 @@ interface SimpleAction {
 
     /*
      * EVENT LISTENERS
-     */
+     * * * * * * * * * */
 
     function addListeners(directive: SimpleDirective) {
         let actions: Function[] = [];
@@ -272,7 +272,7 @@ interface SimpleAction {
 
     /*
      * WATCHERS
-     */
+     * * * * * */
 
     function addWatcher(directive: SimpleDirective) {
         const args = directive.references[0].split(":").slice(1);
@@ -402,7 +402,7 @@ interface SimpleAction {
 
     /*
      * REFERENCE PROCESSING
-     */
+     * * * * * * * * * * * */
 
     function getSimpleReference(reference: string, scope: object): SimpleReference {
         const fallback = {
@@ -527,7 +527,7 @@ interface SimpleAction {
 
     /*
      * UTILITIES
-     */
+     * * * * * * */
 
     function is(target: any) {
         return {
