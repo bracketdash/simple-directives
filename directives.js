@@ -5,7 +5,7 @@
     /*
      * DIRECTIVE REGISTRATION
      * * * * * * * * * * * * */
-    function register(element, skipUnregister, scope) {
+    function register(element, skipUnregister, scope, skipIf) {
         let attributeValue;
         let directiveName;
         let expressions;
@@ -87,10 +87,10 @@
     }
     function addDirective(element, type, references, preReferences, scope) {
         const preReferenceMap = {
-            attr: "attributeName",
-            class: "className",
-            for: "itemName",
-            on: "eventName"
+            attr: "attributeNames",
+            class: "classNames",
+            for: "itemNames",
+            on: "eventNames"
         };
         let directive = { element, type, references };
         let existingRdoFound = false;
@@ -179,7 +179,7 @@
             let attrValIndex;
             let attr = "value";
             refToUpdate = element.getAttribute("sd-attr");
-            if (element.tagName === "input" && is(element.getAttribute("type")).oneOf(["checkbox", "radio"])) {
+            if (element.tagName === "INPUT" && is(element.getAttribute("type")).oneOf(["checkbox", "radio"])) {
                 attr = "checked";
             }
             attrValIndex = refToUpdate.indexOf(attr);
@@ -229,14 +229,23 @@
             lastValue: false
         };
         directive.action = action;
-        window.simpleDirectives.watchers.push(watcher);
         if (watchersRunning) {
-            if (is(directive.type).oneOf(["class", "html"])) {
-                watcher.lastValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
-                action(watcher.lastValue);
+            if (is(directive.type).oneOf(["for", "class", "html"])) {
+                let value = getSimpleValue(getSimpleReference(directive.references[0], directive));
+                action(value);
+                if (typeof value === "object") {
+                    try {
+                        value = JSON.stringify(value);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+                watcher.lastValue = value;
             }
         }
-        else {
+        window.simpleDirectives.watchers.push(watcher);
+        if (!watchersRunning) {
             watchMan();
             watchersRunning = true;
         }
@@ -260,7 +269,9 @@
             }
             else if (newValue !== lastValue) {
                 action(newValue);
-                window.simpleDirectives.watchers[index].lastValue = newValue;
+                if (window.simpleDirectives.watchers[index]) {
+                    window.simpleDirectives.watchers[index].lastValue = newValue;
+                }
             }
         });
         setTimeout(watchMan, 200);
@@ -315,6 +326,18 @@
                         scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
                         register(child, true, scope);
                     });
+                    if (element.tagName === "SELECT") {
+                        const elementDirectiveData = getElementDirectiveData(element);
+                        if (elementDirectiveData.watchers) {
+                            elementDirectiveData.watchers.some(function (simpleAction) {
+                                if (simpleAction.directive.type === "attr" && is("value").oneOf(simpleAction.directive.preReferences)) {
+                                    setTimeout(function () {
+                                        simpleAction.action(simpleAction.lastValue);
+                                    });
+                                }
+                            });
+                        }
+                    }
                 };
                 break;
             case "html":
@@ -335,7 +358,18 @@
             case "attr":
                 action = function (value) {
                     preReferences.forEach(function (attribute) {
-                        if (typeof value === "undefined") {
+                        if (attribute === "value" && element.tagName === "SELECT") {
+                            Array.from(element.getElementsByTagName("option")).forEach(function (optionElement) {
+                                if ((Array.isArray(value) && is(optionElement.value).oneOf(value)) ||
+                                    value == optionElement.value) {
+                                    optionElement.selected = true;
+                                }
+                                else {
+                                    optionElement.selected = false;
+                                }
+                            });
+                        }
+                        else if (typeof value === "undefined") {
                             if (element.hasAttribute(attribute)) {
                                 element.removeAttribute(attribute);
                             }
@@ -404,7 +438,7 @@
         let args = reference.split(":");
         let bang = false;
         let hasDots;
-        let parent;
+        let parent = window.simpleDirectives.root;
         let target;
         reference = args.shift();
         hasDots = reference.indexOf(".") !== -1;
@@ -426,9 +460,12 @@
         if (/[^a-z0-9.[\]$_]/i.test(reference)) {
             return fallback;
         }
-        parent = Object.assign({}, window.simpleDirectives.root, scope);
         if (!hasBrackets && !hasDots) {
             if (parent.hasOwnProperty(reference)) {
+                target = reference;
+            }
+            else if (scope.hasOwnProperty(reference)) {
+                parent = scope;
                 target = reference;
             }
             else {
@@ -462,6 +499,23 @@
                         return true;
                     }
                 });
+                if (parent[target] === reference) {
+                    // wasn't found in the base data; let's try with scope
+                    parent = scope;
+                    parts.some(function (part, index) {
+                        if (index === parts.length - 1) {
+                            target = part;
+                        }
+                        else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
+                            parent = parent[part];
+                        }
+                        else {
+                            parent = { value: reference };
+                            target = "value";
+                            return true;
+                        }
+                    });
+                }
             }
         }
         return { args, bang, parent, scope, target };
