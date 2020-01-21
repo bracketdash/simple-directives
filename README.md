@@ -7,7 +7,7 @@
 Register directives on `element` and all children:
 
 ```javascript
-simpleDirectives.registry.register(element);
+simpleDirectives.register(element);
 ```
 
 Usage:
