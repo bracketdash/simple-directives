@@ -86,13 +86,13 @@ interface SimpleAction {
         });
         if (!skipChildren) {
             Array.from(element.children).forEach(function(child: HTMLElement) {
-                register(child, true);
+                register(child, true, scope);
             });
         }
     }
 
     function unregister(target: HTMLElement) {
-        registry = registry.map(function(directive: SimpleDirective) {
+        window.simpleDirectives.registry = window.simpleDirectives.registry.map(function(directive: SimpleDirective) {
             let { element, type, preReferences, listener, action } = directive;
             if (element === target || target.contains(element)) {
                 if (type === "on") {
@@ -100,20 +100,20 @@ interface SimpleAction {
                         element.removeEventListener(event, listener);
                     });
                 } else {
-                    watchers = watchers.map(function(simpleAction: SimpleAction) {
+                    window.simpleDirectives.watchers = window.simpleDirectives.watchers.map(function(simpleAction: SimpleAction) {
                         if (simpleAction.action === action) {
                             return null;
                         } else {
                             return simpleAction;
                         }
                     });
-                    removeNulls(watchers);
+                    removeNulls(window.simpleDirectives.watchers);
                 }
                 return null;
             }
             return directive;
         });
-        removeNulls(registry);
+        removeNulls(window.simpleDirectives.registry);
     }
 
     function addDirective(
@@ -149,7 +149,7 @@ interface SimpleAction {
             } else if (type === "if") {
                 response = !!getSimpleValue(getSimpleReference(references[0], directive));
             } else if (type === "rdo") {
-                registry.some(function(directive: SimpleDirective) {
+                window.simpleDirectives.registry.some(function(directive: SimpleDirective) {
                     if (directive.type === "rdo" && directive.element === element) {
                         existingRdoFound = true;
                     }
@@ -158,7 +158,7 @@ interface SimpleAction {
             addWatcher(directive);
         }
         if (!existingRdoFound) {
-            registry.push(directive);
+            window.simpleDirectives.registry.push(directive);
         }
         return response;
     }
@@ -264,7 +264,7 @@ interface SimpleAction {
         const args = directive.references[0].split(":").slice(1);
         const action = createAction(directive, args);
         directive.action = action;
-        watchers.push({
+        window.simpleDirectives.watchers.push({
             action,
             directive,
             lastValue: false
@@ -276,7 +276,7 @@ interface SimpleAction {
     }
 
     function watchMan() {
-        watchers.forEach(function(simpleAction: SimpleAction) {
+        window.simpleDirectives.watchers.forEach(function(simpleAction: SimpleAction) {
             const { action, directive, lastValue } = simpleAction;
             const newValue: any = getSimpleValue(getSimpleReference(directive.references[0], directive));
             let newValueStr: string;
