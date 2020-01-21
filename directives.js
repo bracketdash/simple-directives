@@ -6,7 +6,7 @@
     let watchersRunning = false;
     /*
      * DIRECTIVE REGISTRATION
-     */
+     * * * * * * * * * * * * */
     function register(element, skipUnregister, scope) {
         let attributeValue;
         let directiveName;
@@ -129,7 +129,7 @@
     }
     /*
      * EVENT LISTENERS
-     */
+     * * * * * * * * * */
     function addListeners(directive) {
         let actions = [];
         directive.references.forEach(function (reference) {
@@ -156,9 +156,9 @@
             const left = getSimpleReference(parts[0], directive);
             const right = getSimpleReference(parts[1], directive);
             if (right.bang) {
-                action = function () {
+                action = function (event) {
                     if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = !right.parent[right.target]();
+                        left.parent[left.target] = !right.parent[right.target].apply(Object.assign({ event }, directive));
                     }
                     else {
                         left.parent[left.target] = !right.parent[right.target];
@@ -166,9 +166,9 @@
                 };
             }
             else {
-                action = function () {
+                action = function (event) {
                     if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = right.parent[right.target]();
+                        left.parent[left.target] = right.parent[right.target].apply(Object.assign({ event }, directive));
                     }
                     else {
                         left.parent[left.target] = right.parent[right.target];
@@ -178,8 +178,8 @@
         }
         else {
             const simpleReference = getSimpleReference(reference, directive);
-            action = function () {
-                simpleReference.parent[simpleReference.target].apply(directive, simpleReference.args.map(function (arg) {
+            action = function (event) {
+                simpleReference.parent[simpleReference.target].apply(Object.assign({ event }, directive), simpleReference.args.map(function (arg) {
                     let value = getSimpleReference(arg, directive);
                     return value.parent[value.target];
                 }));
@@ -235,7 +235,7 @@
     }
     /*
      * WATCHERS
-     */
+     * * * * * */
     function addWatcher(directive) {
         const args = directive.references[0].split(":").slice(1);
         const action = createAction(directive, args);
@@ -367,7 +367,7 @@
     }
     /*
      * REFERENCE PROCESSING
-     */
+     * * * * * * * * * * * */
     function getSimpleReference(reference, scope) {
         const fallback = {
             parent: {
@@ -491,7 +491,7 @@
     }
     /*
      * UTILITIES
-     */
+     * * * * * * */
     function is(target) {
         return {
             oneOf: function (arr) {

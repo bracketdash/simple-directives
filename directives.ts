@@ -194,17 +194,17 @@ interface SimpleAction {
             const left = getSimpleReference(parts[0], directive);
             const right = getSimpleReference(parts[1], directive);
             if (right.bang) {
-                action = function() {
+                action = function(event: Event) {
                     if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = !right.parent[right.target]();
+                        left.parent[left.target] = !right.parent[right.target].apply(Object.assign({ event }, directive));
                     } else {
                         left.parent[left.target] = !right.parent[right.target];
                     }
                 };
             } else {
-                action = function() {
+                action = function(event: Event) {
                     if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = right.parent[right.target]();
+                        left.parent[left.target] = right.parent[right.target].apply(Object.assign({ event }, directive));
                     } else {
                         left.parent[left.target] = right.parent[right.target];
                     }
@@ -212,9 +212,9 @@ interface SimpleAction {
             }
         } else {
             const simpleReference = getSimpleReference(reference, directive);
-            action = function() {
+            action = function(event: Event) {
                 simpleReference.parent[simpleReference.target].apply(
-                    directive,
+                    Object.assign({ event }, directive),
                     simpleReference.args.map(function(arg) {
                         let value = getSimpleReference(arg, directive);
                         return value.parent[value.target];
