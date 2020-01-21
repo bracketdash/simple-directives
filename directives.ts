@@ -281,8 +281,12 @@ interface SimpleAction {
             const newValue: any = getSimpleValue(getSimpleReference(directive.references[0], directive));
             let newValueStr: string;
             if (typeof newValue === "object") {
-                newValueStr = JSON.stringify(newValue);
-                if (newValueStr !== lastValue) {
+                try {
+                    newValueStr = JSON.stringify(newValue);
+                } catch (e) {
+                    console.log(e);
+                }
+                if (newValueStr && newValueStr !== lastValue) {
                     simpleAction.lastValue = newValueStr;
                     action(newValue);
                 }
@@ -319,7 +323,9 @@ interface SimpleAction {
                     element.innerHTML = directive.originalHTML.repeat($collection.length);
                     if (element.children.length) {
                         Array.from(element.children).forEach(function(child: HTMLElement, $index: number) {
-                            register(child, true, Object.assign($collection[$index], { $collection, $index }));
+                            const scope = {};
+                            scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
+                            register(child, true, scope);
                         });
                     }
                 };
