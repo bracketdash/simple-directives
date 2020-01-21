@@ -239,8 +239,10 @@ const simpleDirectives = {
                 for: "itemName",
                 on: "eventName"
             };
+            let args;
             let directive = { element, type, references };
             let existingRdoFound = false;
+            let reference;
             let response = true;
             let simpleReference;
             if (scope) {
@@ -257,12 +259,15 @@ const simpleDirectives = {
                     directive.originalHTML = element.innerHTML;
                     break;
                 case "if":
-                    simpleReference = simpleDirectives.references.convert(references[0], scope);
-                    if (simpleReference.bang) {
-                        response = !simpleReference.parent[simpleReference.target];
+                    args = references[0].split(":");
+                    reference = response.shift();
+                    simpleReference = simpleDirectives.references.convert(reference, directive);
+                    response = simpleReference.parent[simpleReference.target];
+                    if (typeof response === "function") {
+                        response = response.apply(directive, args);
                     }
-                    else {
-                        response = !!simpleReference.parent[simpleReference.target];
+                    if (simpleReference.bang) {
+                        response = !response;
                     }
                     break;
                 case "rdo":
@@ -290,12 +295,15 @@ const simpleDirectives = {
         register: function (element, skipUnregister, scope) {
             let directiveName;
             let expressions;
+            let parts;
+            let preReferences;
+            let references;
             let skipChildren = false;
+            let value;
             if (!skipUnregister) {
                 simpleDirectives.registry.unregister(element);
             }
             ["if", "attr", "class", "for", "html", "on", "rdo"].some(function (type) {
-                let value;
                 directiveName = `sd-${type}`;
                 if (element.hasAttribute(directiveName)) {
                     expressions = element
@@ -308,31 +316,20 @@ const simpleDirectives = {
                 }
                 if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
                     expressions.forEach(function (expression) {
-                        const parts = expression.split(":");
-                        const preReferences = parts.shift().split(",");
-                        const references = parts.join(":").split(",");
-                        if (scope) {
-                            simpleDirectives.registry.add(element, type, references, preReferences, scope);
-                        }
-                        else {
-                            simpleDirectives.registry.add(element, type, references, preReferences);
-                        }
+                        parts = expression.split(":");
+                        preReferences = parts.shift().split(",");
+                        references = parts.join(":").split(",");
+                        simpleDirectives.registry.add(element, type, references, preReferences, scope);
                     });
                 }
-                else if (scope) {
+                else {
                     value = simpleDirectives.registry.add(element, type, [expressions[0]], [], scope);
                 }
-                else {
-                    value = simpleDirectives.registry.add(element, type, [expressions[0]]);
-                }
                 if (type === "if") {
-                    if (value === false) {
+                    if (!value) {
                         element.style.display = "none";
                         skipChildren = true;
                         return true;
-                    }
-                    else {
-                        return false;
                     }
                 }
                 else if (type === "for") {
@@ -490,10 +487,9 @@ const simpleDirectives = {
     },
     watchers: {
         addAction: function (directive) {
-            let args = directive.references[0].split(":");
-            const reference = args.shift();
+            const args = directive.references[0].split(":").slice(1);
             const action = simpleDirectives.tools.createAction(directive, args);
-            directive.watcherAction = action;
+            directive.action = action;
             simpleDirectives.watchers.cache.push({
                 action,
                 directive,
@@ -501,12 +497,13 @@ const simpleDirectives = {
             });
             if (!simpleDirectives.watchers.running) {
                 simpleDirectives.watchers.runner();
+                simpleDirectives.watchers.running = true;
             }
         },
         cache: [],
         removeAction: function (directive) {
             simpleDirectives.watchers.cache = simpleDirectives.watchers.cache.map(function (simpleAction) {
-                if (simpleAction.action === directive.watcherAction) {
+                if (simpleAction.action === directive.action) {
                     return null;
                 }
                 else {
@@ -516,27 +513,24 @@ const simpleDirectives = {
             simpleDirectives.tools.removeNulls(simpleDirectives.watchers.cache);
         },
         runner: function () {
-            if (!simpleDirectives.watchers.running) {
-                simpleDirectives.watchers.running = true;
-            }
             simpleDirectives.watchers.cache.forEach(function (simpleAction) {
                 const { action, directive, lastValue } = simpleAction;
                 const args = directive.references[0].split(":");
                 const reference = args.shift();
-                const value = simpleDirectives.references.convert(reference, directive);
-                let newValue = value.parent[value.target];
+                const simpleReference = simpleDirectives.references.convert(reference, directive);
+                let newValue = simpleReference.parent[simpleReference.target];
                 if (typeof newValue === "function") {
                     newValue = newValue.apply(directive, args);
                 }
-                if (value.bang) {
+                if (simpleReference.bang) {
                     newValue = !newValue;
                 }
-                if (newValue != lastValue) {
+                if (newValue !== lastValue) {
                     simpleAction.lastValue = newValue;
                     action(newValue);
                 }
             });
-            setTimeout(simpleDirectives.watchers.runner, 250);
+            setTimeout(simpleDirectives.watchers.runner, 200);
         },
         running: false
     }
