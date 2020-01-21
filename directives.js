@@ -155,29 +155,9 @@
             const parts = reference.split("=");
             const left = getSimpleReference(parts[0], directive);
             const right = getSimpleReference(parts[1], directive);
-            if (right.bang) {
-                action = function (event) {
-                    if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = !right.parent[right.target].apply(Object.assign({ event }, directive), right.args.map(function (arg) {
-                            let value = getSimpleReference(arg, directive);
-                            return value.parent[value.target];
-                        }));
-                    }
-                    else {
-                        left.parent[left.target] = !right.parent[right.target];
-                    }
-                };
-            }
-            else {
-                action = function (event) {
-                    if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = right.parent[right.target].apply(Object.assign({ event }, directive));
-                    }
-                    else {
-                        left.parent[left.target] = right.parent[right.target];
-                    }
-                };
-            }
+            action = function (event) {
+                left.parent[left.target] = getSimpleValue(right);
+            };
         }
         else {
             const simpleReference = getSimpleReference(reference, directive);
