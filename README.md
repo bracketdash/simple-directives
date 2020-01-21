@@ -176,5 +176,3 @@ If the argument is not a valid reference, it will be passed as a string.
 If you intend to pass a string as the argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
-
-Arguments cannot be added to comparison or assignment expressions.

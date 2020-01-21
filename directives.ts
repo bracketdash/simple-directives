@@ -196,7 +196,13 @@ interface SimpleAction {
             if (right.bang) {
                 action = function(event: Event) {
                     if (typeof right.parent[right.target] === "function") {
-                        left.parent[left.target] = !right.parent[right.target].apply(Object.assign({ event }, directive));
+                        left.parent[left.target] = !right.parent[right.target].apply(
+                            Object.assign({ event }, directive),
+                            right.args.map(function(arg) {
+                                let value = getSimpleReference(arg, directive);
+                                return value.parent[value.target];
+                            })
+                        );
                     } else {
                         left.parent[left.target] = !right.parent[right.target];
                     }
