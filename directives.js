@@ -237,7 +237,15 @@
         watchers.forEach(function (simpleAction) {
             const { action, directive, lastValue } = simpleAction;
             const newValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
-            if (newValue !== lastValue) {
+            let newValueStr;
+            if (typeof newValue === "object") {
+                newValueStr = JSON.stringify(newValue);
+                if (newValueStr !== lastValue) {
+                    simpleAction.lastValue = newValueStr;
+                    action(newValue);
+                }
+            }
+            else if (newValue !== lastValue) {
                 simpleAction.lastValue = newValue;
                 action(newValue);
             }
@@ -261,6 +269,20 @@
                 };
                 break;
             case "for":
+                action = function ($collection) {
+                    if (element.children.length) {
+                        Array.from(element.children).forEach(function (child) {
+                            unregister(child);
+                        });
+                    }
+                    element.innerHTML = directive.originalHTML.repeat($collection.length);
+                    if (element.children.length) {
+                        Array.from(element.children).forEach(function (child, $index) {
+                            register(child, true, Object.assign($collection[$index], { $collection, $index }));
+                        });
+                    }
+                };
+                break;
             case "html":
                 action = function (value) {
                     if (element.children.length) {
@@ -271,7 +293,7 @@
                     element.innerHTML = value;
                     if (element.children.length) {
                         Array.from(element.children).forEach(function (child) {
-                            unregister(child);
+                            register(child, true);
                         });
                     }
                 };
@@ -305,20 +327,7 @@
                 break;
             case "class":
                 action = function (value) {
-                    if (preReferences.length > 1) {
-                        preReferences.forEach(function (className) {
-                            if (!value) {
-                                if (element.classList.contains(className)) {
-                                    element.classList.remove(className);
-                                }
-                            }
-                            else if (!element.classList.contains(className)) {
-                                element.classList.add(className);
-                            }
-                        });
-                    }
-                    else {
-                        const className = preReferences[0];
+                    preReferences.forEach(function (className) {
                         if (!value) {
                             if (element.classList.contains(className)) {
                                 element.classList.remove(className);
@@ -327,7 +336,7 @@
                         else if (!element.classList.contains(className)) {
                             element.classList.add(className);
                         }
-                    }
+                    });
                 };
                 break;
         }

@@ -278,8 +278,15 @@ interface SimpleAction {
     function watchMan() {
         watchers.forEach(function(simpleAction: SimpleAction) {
             const { action, directive, lastValue } = simpleAction;
-            const newValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
-            if (newValue !== lastValue) {
+            const newValue: any = getSimpleValue(getSimpleReference(directive.references[0], directive));
+            let newValueStr: string;
+            if (typeof newValue === "object") {
+                newValueStr = JSON.stringify(newValue);
+                if (newValueStr !== lastValue) {
+                    simpleAction.lastValue = newValueStr;
+                    action(newValue);
+                }
+            } else if (newValue !== lastValue) {
                 simpleAction.lastValue = newValue;
                 action(newValue);
             }
@@ -303,6 +310,20 @@ interface SimpleAction {
                 };
                 break;
             case "for":
+                action = function($collection) {
+                    if (element.children.length) {
+                        Array.from(element.children).forEach(function(child: HTMLElement) {
+                            unregister(child);
+                        });
+                    }
+                    element.innerHTML = directive.originalHTML.repeat($collection.length);
+                    if (element.children.length) {
+                        Array.from(element.children).forEach(function(child: HTMLElement, $index: number) {
+                            register(child, true, Object.assign($collection[$index], { $collection, $index }));
+                        });
+                    }
+                };
+                break;
             case "html":
                 action = function(value) {
                     if (element.children.length) {
@@ -313,7 +334,7 @@ interface SimpleAction {
                     element.innerHTML = value;
                     if (element.children.length) {
                         Array.from(element.children).forEach(function(child: HTMLElement) {
-                            unregister(child);
+                            register(child, true);
                         });
                     }
                 };
@@ -345,18 +366,7 @@ interface SimpleAction {
                 break;
             case "class":
                 action = function(value) {
-                    if (preReferences.length > 1) {
-                        preReferences.forEach(function(className) {
-                            if (!value) {
-                                if (element.classList.contains(className)) {
-                                    element.classList.remove(className);
-                                }
-                            } else if (!element.classList.contains(className)) {
-                                element.classList.add(className);
-                            }
-                        });
-                    } else {
-                        const className = preReferences[0];
+                    preReferences.forEach(function(className) {
                         if (!value) {
                             if (element.classList.contains(className)) {
                                 element.classList.remove(className);
@@ -364,7 +374,7 @@ interface SimpleAction {
                         } else if (!element.classList.contains(className)) {
                             element.classList.add(className);
                         }
-                    }
+                    });
                 };
                 break;
         }

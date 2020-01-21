@@ -74,10 +74,7 @@ Truthy: The element will have the given class(es).
 "Item" should be the alias to assign to each item.
 
 -   The aliased item will be in the scope of each reference inside the loop.
--   The item will also have these properties available:
-    -   `$collection`
-    -   `$index`
-    -   `$key`
+-   The item will also have `$collection` and `$index` available.
 
 > Use unique item names in nested loops to avoid overwrites.
 
