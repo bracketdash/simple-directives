@@ -278,9 +278,7 @@ interface SimpleAction {
     function watchMan() {
         watchers.forEach(function(simpleAction: SimpleAction) {
             const { action, directive, lastValue } = simpleAction;
-            const args = directive.references[0].split(":");
-            const reference = args.shift();
-            const newValue = getSimpleValue(getSimpleReference(reference, directive));
+            const newValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
             if (newValue !== lastValue) {
                 simpleAction.lastValue = newValue;
                 action(newValue);
