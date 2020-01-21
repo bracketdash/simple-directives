@@ -4,6 +4,7 @@ interface Window {
     simpleDirectives: SimpleDirectives;
 }
 interface SimpleDirectives {
+    getElementDirectiveData: Function;
     is: Function;
     register: Function;
     registry: SimpleDirective[];
@@ -13,13 +14,13 @@ interface SimpleDirectives {
     watchers: SimpleAction[];
 }
 interface SimpleDirective {
+    action?: Function;
     element: HTMLElement;
     listener?: EventListenerObject;
     originalHTML?: string;
     preReferences?: string[];
     references: string[];
     type: string;
-    action?: Function;
 }
 interface SimpleReference {
     args?: string[];
@@ -268,16 +269,17 @@ interface SimpleAction {
     function addWatcher(directive: SimpleDirective) {
         const args = directive.references[0].split(":").slice(1);
         const action = createAction(directive, args);
-        directive.action = action;
-        window.simpleDirectives.watchers.push({
+        const watcher: SimpleAction = {
             action,
             directive,
             lastValue: false
-        });
+        };
+        directive.action = action;
+        window.simpleDirectives.watchers.push(watcher);
         if (watchersRunning) {
             if (is(directive.type).oneOf(["class", "html"])) {
-                const value = getSimpleValue(getSimpleReference(directive.references[0], directive));
-                action(value);
+                watcher.lastValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
+                action(watcher.lastValue);
             }
         } else {
             watchMan();
@@ -347,14 +349,14 @@ interface SimpleAction {
                     } else if (element.innerHTML === goalHTML) {
                         element.innerHTML = goalHTML;
                     }
-                    Array.from(element.children).forEach(function(child: HTMLElement, $index: number) {
+                    element.style.width = null;
+                    element.style.height = null;
+                    element.style.overflow = null;
+                    Array.from(element.children).some(function(child: HTMLElement, $index: number) {
                         const scope = {};
                         scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
                         register(child, true, scope);
                     });
-                    element.style.width = null;
-                    element.style.height = null;
-                    element.style.overflow = null;
                 };
                 break;
             case "html":
@@ -556,6 +558,27 @@ interface SimpleAction {
      * UTILITIES
      * * * * * * */
 
+    function getElementDirectiveData(target: HTMLElement) {
+        const data = {
+            watchers: [],
+            directives: []
+        };
+        window.simpleDirectives.registry.forEach(function(directive: SimpleDirective) {
+            let { element, type, action } = directive;
+            if (element === target) {
+                data.directives.push(directive);
+                if (type !== "on") {
+                    window.simpleDirectives.watchers.forEach(function(simpleAction: SimpleAction) {
+                        if (simpleAction.action === action) {
+                            data.watchers.push(simpleAction);
+                        }
+                    });
+                }
+            }
+        });
+        return data;
+    }
+
     function is(target: any) {
         return {
             oneOf: function(arr: any[]) {
@@ -572,6 +595,7 @@ interface SimpleAction {
     }
 
     window.simpleDirectives = {
+        getElementDirectiveData,
         is,
         register,
         registry,

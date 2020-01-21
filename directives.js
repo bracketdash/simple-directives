@@ -223,16 +223,17 @@
     function addWatcher(directive) {
         const args = directive.references[0].split(":").slice(1);
         const action = createAction(directive, args);
-        directive.action = action;
-        window.simpleDirectives.watchers.push({
+        const watcher = {
             action,
             directive,
             lastValue: false
-        });
+        };
+        directive.action = action;
+        window.simpleDirectives.watchers.push(watcher);
         if (watchersRunning) {
             if (is(directive.type).oneOf(["class", "html"])) {
-                const value = getSimpleValue(getSimpleReference(directive.references[0], directive));
-                action(value);
+                watcher.lastValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
+                action(watcher.lastValue);
             }
         }
         else {
@@ -306,14 +307,14 @@
                     else if (element.innerHTML === goalHTML) {
                         element.innerHTML = goalHTML;
                     }
-                    Array.from(element.children).forEach(function (child, $index) {
+                    element.style.width = null;
+                    element.style.height = null;
+                    element.style.overflow = null;
+                    Array.from(element.children).some(function (child, $index) {
                         const scope = {};
                         scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
                         register(child, true, scope);
                     });
-                    element.style.width = null;
-                    element.style.height = null;
-                    element.style.overflow = null;
                 };
                 break;
             case "html":
@@ -515,6 +516,26 @@
     /*
      * UTILITIES
      * * * * * * */
+    function getElementDirectiveData(target) {
+        const data = {
+            watchers: [],
+            directives: []
+        };
+        window.simpleDirectives.registry.forEach(function (directive) {
+            let { element, type, action } = directive;
+            if (element === target) {
+                data.directives.push(directive);
+                if (type !== "on") {
+                    window.simpleDirectives.watchers.forEach(function (simpleAction) {
+                        if (simpleAction.action === action) {
+                            data.watchers.push(simpleAction);
+                        }
+                    });
+                }
+            }
+        });
+        return data;
+    }
     function is(target) {
         return {
             oneOf: function (arr) {
@@ -529,6 +550,7 @@
         }
     }
     window.simpleDirectives = {
+        getElementDirectiveData,
         is,
         register,
         registry,
