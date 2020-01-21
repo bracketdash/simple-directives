@@ -229,7 +229,13 @@
             directive,
             lastValue: false
         });
-        if (!watchersRunning) {
+        if (watchersRunning) {
+            if (is(directive.type).oneOf(["class", "html"])) {
+                const value = getSimpleValue(getSimpleReference(directive.references[0], directive));
+                action(value);
+            }
+        }
+        else {
             watchMan();
             watchersRunning = true;
         }
