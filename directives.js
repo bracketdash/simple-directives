@@ -1,456 +1,331 @@
 // A Simple Directives Library
 // https://github.com/bracketdash/simple-directives/blob/master/README.md
-const simpleDirectives = {
-    events: {
-        addListeners: function (directive) {
-            let actions = [];
-            directive.references.forEach(function (reference) {
-                actions.push(simpleDirectives.events.getAction(directive, reference));
-            });
-            directive.listener = {
-                handleEvent: function (event) {
-                    actions.forEach(function (action) {
-                        action();
-                    });
-                }
-            };
-            directive.preReferences.forEach(function (eventName) {
-                directive.element.addEventListener(eventName, directive.listener);
-            });
-        },
-        getAction: function (directive, reference) {
-            let action;
-            if (reference === "$update") {
-                return simpleDirectives.events.getUpdater(directive);
-            }
-            if (reference.indexOf("=") !== -1) {
-                const parts = reference.split("=");
-                const left = simpleDirectives.references.convert(parts[0], directive);
-                const right = simpleDirectives.references.convert(parts[1], directive);
-                if (right.bang) {
-                    action = function () {
-                        if (typeof right.parent[right.target] === "function") {
-                            left.parent[left.target] = !right.parent[right.target]();
-                        }
-                        else {
-                            left.parent[left.target] = !right.parent[right.target];
-                        }
-                    };
-                }
-                else {
-                    action = function () {
-                        if (typeof right.parent[right.target] === "function") {
-                            left.parent[left.target] = right.parent[right.target]();
-                        }
-                        else {
-                            left.parent[left.target] = right.parent[right.target];
-                        }
-                    };
-                }
-            }
-            else {
-                const parts = reference.split(":");
-                const value = simpleDirectives.references.convert(parts[0], directive);
-                reference = parts.shift();
-                action = function () {
-                    let args = parts.map(function (arg) {
-                        let value = simpleDirectives.references.convert(arg, directive);
-                        return value.parent[value.target];
-                    });
-                    value.parent[value.target].apply(directive, args);
-                };
-            }
-            return action;
-        },
-        getUpdater: function (directive) {
-            let { element } = directive;
-            let refToUpdate;
-            let updater;
-            if (element.hasAttribute("sd-attr")) {
-                let attrValIndex;
-                let attr = "value";
-                refToUpdate = element.getAttribute("sd-attr");
-                if (element.tagName === "input" && ["checkbox", "radio"].indexOf(element.getAttribute("type")) !== -1) {
-                    attr = "checked";
-                }
-                attrValIndex = refToUpdate.indexOf(attr);
-                if (attrValIndex !== -1) {
-                    refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
-                    attrValIndex = refToUpdate.indexOf(";");
-                    if (attrValIndex !== -1) {
-                        refToUpdate = refToUpdate.substring(0, attrValIndex);
-                    }
-                    refToUpdate = simpleDirectives.references.convert(refToUpdate, directive);
-                    updater = function () {
-                        refToUpdate.parent[refToUpdate.target] = element[attr];
-                    };
-                }
-            }
-            else if (element.hasAttribute("sd-html") && element.isContentEditable) {
-                refToUpdate = simpleDirectives.references.convert(element.getAttribute("sd-html"), directive);
-                updater = function () {
-                    refToUpdate.parent[refToUpdate.target] = element.innerHTML;
-                };
-            }
-            else if (element.hasAttribute("sd-rdo")) {
-                refToUpdate = simpleDirectives.references.convert(element.getAttribute("sd-rdo"), directive);
-                updater = function () {
-                    let value;
-                    Array.from(document.getElementsByName(element.getAttribute("name"))).some(function (el) {
-                        if (el.checked) {
-                            value = el.value;
-                            return true;
-                        }
-                    });
-                    refToUpdate.parent[refToUpdate.target] = value;
-                };
-            }
-            return updater;
+(function () {
+    let registry = [];
+    let watchers = [];
+    let watchersRunning = false;
+    /*
+     * DIRECTIVE REGISTRATION
+     */
+    function register(element, skipUnregister, scope) {
+        let attributeValue;
+        let directiveName;
+        let expressions;
+        let parts;
+        let preReferences;
+        let references;
+        let skipChildren = false;
+        let value;
+        if (!skipUnregister) {
+            unregister(element);
         }
-    },
-    references: {
-        comparison: function (comparator, reference, scope) {
-            const parts = reference.split(comparator);
-            let left = simpleDirectives.references.convert(parts[0], scope);
-            let right = simpleDirectives.references.convert(parts[1], scope);
-            if (typeof left.parent[left.target] === "function") {
-                left = left.parent[left.target].apply(scope);
-            }
-            else if (left.bang) {
-                left = !left.parent[left.target];
+        ["if", "attr", "class", "for", "html", "on", "rdo"].some(function (type) {
+            directiveName = `sd-${type}`;
+            attributeValue = element.getAttribute(directiveName);
+            if (attributeValue) {
+                expressions = attributeValue.replace(/\s+/, "").split(";");
             }
             else {
-                left = left.parent[left.target];
+                // skip this attribute but look for more
+                return false;
             }
-            if (typeof right.parent[right.target] === "function") {
-                right = right.parent[right.target].apply(scope);
-            }
-            else if (right.bang) {
-                right = !right.parent[right.target];
-            }
-            else {
-                right = right.parent[right.target];
-            }
-            let value;
-            switch (comparator) {
-                case "==":
-                    value = left == right;
-                    break;
-                case "===":
-                    value = left === right;
-                    break;
-                case "!=":
-                    value = left != right;
-                    break;
-                case "!==":
-                    value = left != right;
-                    break;
-                case "<":
-                    value = left < right;
-                    break;
-                case ">":
-                    value = left > right;
-                    break;
-                case "<=":
-                    value = left <= right;
-                    break;
-                case ">=":
-                    value = left >= right;
-                    break;
-            }
-            return {
-                parent: { value },
-                target: "value"
-            };
-        },
-        convert: function (reference, scope) {
-            const fallback = {
-                parent: { value: reference },
-                target: "value"
-            };
-            const hasBrackets = reference.indexOf("[") !== -1;
-            let bang = false;
-            let hasDots;
-            let parent;
-            let refArgs = reference.split(":");
-            let target;
-            reference = refArgs.shift();
-            hasDots = reference.indexOf(".") !== -1;
-            if (/[=<!>]/.test(reference)) {
-                if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
-                    reference = reference.substring(1);
-                    bang = true;
-                }
-                else {
-                    let comparator = reference.match(/([=<!>]{2,3})/)[0];
-                    if (["==", "===", "!=", "!==", "<", ">", "<=", ">="].indexOf(comparator) !== -1) {
-                        return simpleDirectives.references.comparison(comparator, reference, scope);
-                    }
-                    else {
-                        return fallback;
-                    }
-                }
-            }
-            if (/[^a-z0-9.[\]$_]/i.test(reference)) {
-                return fallback;
-            }
-            parent = Object.assign({}, simpleDirectives.root, scope);
-            if (!hasBrackets && !hasDots) {
-                target = reference;
-            }
-            else {
-                if (hasBrackets) {
-                    while (/\[[^\[\]]*\]/.test(reference)) {
-                        reference = reference.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
-                            let capRef = simpleDirectives.references.convert(capture, scope);
-                            return "." + capRef.parent[capRef.target];
-                        });
-                    }
-                    if (!hasDots) {
-                        hasDots = true;
-                    }
-                }
-                if (hasDots) {
-                    let parts = reference.split(".");
-                    parts.some(function (part, index) {
-                        if (index === parts.length - 1) {
-                            target = part;
-                        }
-                        else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
-                            parent = parent[part];
-                        }
-                        else {
-                            parent = { value: reference };
-                            target = "value";
-                            return true;
-                        }
-                    });
-                }
-            }
-            return { bang, parent, target, refArgs };
-        }
-    },
-    register: this.registry.register,
-    registry: {
-        add: function (element, type, references, preReferences, scope) {
-            const preReferenceMap = {
-                attr: "attributeName",
-                class: "className",
-                for: "itemName",
-                on: "eventName"
-            };
-            let args;
-            let directive = { element, type, references };
-            let existingRdoFound = false;
-            let reference;
-            let response = true;
-            let simpleReference;
-            if (scope) {
-                Object.assign(directive, scope);
-            }
-            if (preReferences) {
-                directive.preReferences = preReferences;
-                if (preReferenceMap[type]) {
-                    directive[preReferenceMap[type]] = preReferences;
-                }
-            }
-            switch (type) {
-                case "for":
-                    directive.originalHTML = element.innerHTML;
-                    break;
-                case "if":
-                    args = references[0].split(":");
-                    reference = response.shift();
-                    simpleReference = simpleDirectives.references.convert(reference, directive);
-                    response = simpleReference.parent[simpleReference.target];
-                    if (typeof response === "function") {
-                        response = response.apply(directive, args);
-                    }
-                    if (simpleReference.bang) {
-                        response = !response;
-                    }
-                    break;
-                case "rdo":
-                    simpleDirectives.registry.cache.some(function (directive) {
-                        if (directive.type === "rdo" && directive.element === element) {
-                            existingRdoFound = true;
-                        }
-                    });
-                    break;
-                default:
-                    break;
-            }
-            if (type === "on") {
-                simpleDirectives.events.addListeners(directive);
-            }
-            else {
-                simpleDirectives.watchers.addAction(directive);
-            }
-            if (!existingRdoFound) {
-                simpleDirectives.registry.cache.push(directive);
-            }
-            return response;
-        },
-        cache: [],
-        register: function (element, skipUnregister, scope) {
-            let directiveName;
-            let expressions;
-            let parts;
-            let preReferences;
-            let references;
-            let skipChildren = false;
-            let value;
-            if (!skipUnregister) {
-                simpleDirectives.registry.unregister(element);
-            }
-            ["if", "attr", "class", "for", "html", "on", "rdo"].some(function (type) {
-                directiveName = `sd-${type}`;
-                if (element.hasAttribute(directiveName)) {
-                    expressions = element
-                        .getAttribute(directiveName)
-                        .replace(/\s+/, "")
-                        .split(";");
-                }
-                else {
-                    return false;
-                }
-                if (["attr", "class", "for", "on"].indexOf(type) !== -1) {
-                    expressions.forEach(function (expression) {
-                        parts = expression.split(":");
-                        preReferences = parts.shift().split(",");
-                        references = parts.join(":").split(",");
-                        simpleDirectives.registry.add(element, type, references, preReferences, scope);
-                    });
-                }
-                else {
-                    value = simpleDirectives.registry.add(element, type, [expressions[0]], [], scope);
-                }
-                if (type === "if") {
-                    if (!value) {
-                        element.style.display = "none";
-                        skipChildren = true;
-                        return true;
-                    }
-                }
-                else if (type === "for") {
-                    skipChildren = true;
-                }
-            });
-            if (!skipChildren) {
-                Array.from(element.children).forEach(function (child) {
-                    simpleDirectives.registry.register(child, true);
+            if (is(type).oneOf(["attr", "class", "for", "on"])) {
+                expressions.forEach(function (expression) {
+                    parts = expression.split(":");
+                    preReferences = parts.shift().split(",");
+                    references = parts.join(":").split(",");
+                    addDirective(element, type, references, preReferences, scope);
                 });
             }
-        },
-        unregister: function (parentElement) {
-            simpleDirectives.registry.cache = simpleDirectives.registry.cache.map(function (directive) {
-                let { element, type } = directive;
-                if (element === parentElement || parentElement.contains(element)) {
-                    if (type === "on") {
-                        directive.preReferences.forEach(function (event) {
-                            element.removeEventListener(event, directive.listener);
-                        });
+            else {
+                value = addDirective(element, type, [expressions[0]], [], scope);
+            }
+            if (type === "if") {
+                if (!value) {
+                    element.style.display = "none";
+                    skipChildren = true;
+                    // skip this attribute and do NOT look for more
+                    return true;
+                }
+            }
+            else if (type === "for") {
+                skipChildren = true;
+            }
+        });
+        if (!skipChildren) {
+            Array.from(element.children).forEach(function (child) {
+                register(child, true);
+            });
+        }
+    }
+    function unregister(target) {
+        registry = registry.map(function (directive) {
+            let { element, type, preReferences, listener, action } = directive;
+            if (element === target || target.contains(element)) {
+                if (type === "on") {
+                    preReferences.forEach(function (event) {
+                        element.removeEventListener(event, listener);
+                    });
+                }
+                else {
+                    watchers = watchers.map(function (simpleAction) {
+                        if (simpleAction.action === action) {
+                            return null;
+                        }
+                        else {
+                            return simpleAction;
+                        }
+                    });
+                    removeNulls(watchers);
+                }
+                return null;
+            }
+            return directive;
+        });
+        removeNulls(registry);
+    }
+    function addDirective(element, type, references, preReferences, scope) {
+        const preReferenceMap = {
+            attr: "attributeName",
+            class: "className",
+            for: "itemName",
+            on: "eventName"
+        };
+        let directive = { element, type, references };
+        let existingRdoFound = false;
+        let response = true;
+        if (scope) {
+            Object.assign(directive, scope);
+        }
+        if (preReferences) {
+            directive.preReferences = preReferences;
+            if (preReferenceMap[type]) {
+                directive[preReferenceMap[type]] = preReferences;
+            }
+        }
+        if (type === "on") {
+            addListeners(directive);
+        }
+        else {
+            if (type === "for") {
+                directive.originalHTML = element.innerHTML;
+            }
+            else if (type === "if") {
+                response = !!getSimpleValue(getSimpleReference(references[0], directive));
+            }
+            else if (type === "rdo") {
+                registry.some(function (directive) {
+                    if (directive.type === "rdo" && directive.element === element) {
+                        existingRdoFound = true;
+                    }
+                });
+            }
+            addWatcher(directive);
+        }
+        if (!existingRdoFound) {
+            registry.push(directive);
+        }
+        return response;
+    }
+    /*
+     * EVENT LISTENERS
+     */
+    function addListeners(directive) {
+        let actions = [];
+        directive.references.forEach(function (reference) {
+            actions.push(getEventAction(directive, reference));
+        });
+        directive.listener = {
+            handleEvent: function (event) {
+                actions.forEach(function (action) {
+                    action(event);
+                });
+            }
+        };
+        directive.preReferences.forEach(function (eventName) {
+            directive.element.addEventListener(eventName, directive.listener);
+        });
+    }
+    function getEventAction(directive, reference) {
+        let action;
+        if (reference === "$update") {
+            return getUpdater(directive);
+        }
+        if (reference.indexOf("=") !== -1) {
+            const parts = reference.split("=");
+            const left = getSimpleReference(parts[0], directive);
+            const right = getSimpleReference(parts[1], directive);
+            if (right.bang) {
+                action = function () {
+                    if (typeof right.parent[right.target] === "function") {
+                        left.parent[left.target] = !right.parent[right.target]();
                     }
                     else {
-                        simpleDirectives.watchers.removeAction(directive);
+                        left.parent[left.target] = !right.parent[right.target];
                     }
-                    return null;
-                }
-                return directive;
-            });
-            simpleDirectives.tools.removeNulls(simpleDirectives.registry.cache);
+                };
+            }
+            else {
+                action = function () {
+                    if (typeof right.parent[right.target] === "function") {
+                        left.parent[left.target] = right.parent[right.target]();
+                    }
+                    else {
+                        left.parent[left.target] = right.parent[right.target];
+                    }
+                };
+            }
         }
-    },
-    root: window,
-    tools: {
-        createAction: function (directive, args) {
-            const { type, element, preReferences } = directive;
-            let action;
-            switch (type) {
-                case "if":
-                    action = function (value) {
-                        if (value) {
-                            element.style.display = null;
-                            simpleDirectives.registry.register(element);
-                        }
-                        else {
-                            element.style.display = "none";
-                            simpleDirectives.registry.unregister(element);
-                        }
-                    };
-                    break;
-                case "for":
-                case "html":
-                    action = function (value) {
-                        if (element.children.length) {
-                            Array.from(element.children).forEach(function (child) {
-                                simpleDirectives.registry.unregister(child);
-                            });
-                        }
-                        element.innerHTML = value;
-                        if (element.children.length) {
-                            Array.from(element.children).forEach(function (child) {
-                                simpleDirectives.registry.unregister(child);
-                            });
-                        }
-                    };
-                    break;
-                case "attr":
-                    action = function (value) {
-                        if (preReferences.length > 1) {
-                            preReferences.forEach(function (attribute) {
-                                if (typeof value === "undefined") {
-                                    if (element.hasAttribute(attribute)) {
-                                        element.removeAttribute(attribute);
-                                    }
-                                }
-                                else {
-                                    element.setAttribute(attribute, value);
-                                }
-                            });
-                        }
-                        else {
-                            const attribute = preReferences[0];
-                            if (typeof value === "undefined") {
-                                if (element.hasAttribute(attribute)) {
-                                    element.removeAttribute(attribute);
-                                }
-                            }
-                            else {
-                                element.setAttribute(attribute, value);
-                            }
-                        }
-                    };
-                    break;
-                case "rdo":
-                    action = function (value) {
-                        const radioInputs = Array.from(document.getElementsByName(element.getAttribute("name")));
-                        radioInputs.forEach(function (radioInput) {
-                            if (radioInput.value === value) {
-                                radioInput.checked = true;
-                            }
-                            else {
-                                radioInput.checked = false;
-                            }
+        else {
+            const simpleReference = getSimpleReference(reference, directive);
+            action = function () {
+                simpleReference.parent[simpleReference.target].apply(directive, simpleReference.args.map(function (arg) {
+                    let value = getSimpleReference(arg, directive);
+                    return value.parent[value.target];
+                }));
+            };
+        }
+        return action;
+    }
+    function getUpdater(directive) {
+        let { element } = directive;
+        let refToUpdate;
+        let updater;
+        if (element.hasAttribute("sd-attr")) {
+            let attrValIndex;
+            let attr = "value";
+            refToUpdate = element.getAttribute("sd-attr");
+            if (element.tagName === "input" && is(element.getAttribute("type")).oneOf(["checkbox", "radio"])) {
+                attr = "checked";
+            }
+            attrValIndex = refToUpdate.indexOf(attr);
+            if (attrValIndex !== -1) {
+                refToUpdate = refToUpdate.substring(attrValIndex).split(":")[1];
+                attrValIndex = refToUpdate.indexOf(";");
+                if (attrValIndex !== -1) {
+                    refToUpdate = refToUpdate.substring(0, attrValIndex);
+                }
+                refToUpdate = getSimpleReference(refToUpdate, directive);
+                updater = function () {
+                    refToUpdate.parent[refToUpdate.target] = element[attr];
+                };
+            }
+        }
+        else if (element.hasAttribute("sd-html") && element.isContentEditable) {
+            refToUpdate = getSimpleReference(element.getAttribute("sd-html"), directive);
+            updater = function () {
+                refToUpdate.parent[refToUpdate.target] = element.innerHTML;
+            };
+        }
+        else if (element.hasAttribute("sd-rdo")) {
+            refToUpdate = getSimpleReference(element.getAttribute("sd-rdo"), directive);
+            updater = function () {
+                const radioInputs = Array.from(document.getElementsByName(element.getAttribute("name")));
+                let value;
+                radioInputs.some(function (radioInput) {
+                    if (radioInput.checked) {
+                        value = radioInput.value;
+                        return true;
+                    }
+                });
+                refToUpdate.parent[refToUpdate.target] = value;
+            };
+        }
+        return updater;
+    }
+    /*
+     * WATCHERS
+     */
+    function addWatcher(directive) {
+        const args = directive.references[0].split(":").slice(1);
+        const action = createAction(directive, args);
+        directive.action = action;
+        watchers.push({
+            action,
+            directive,
+            lastValue: false
+        });
+        if (!watchersRunning) {
+            watchMan();
+            watchersRunning = true;
+        }
+    }
+    function watchMan() {
+        watchers.forEach(function (simpleAction) {
+            const { action, directive, lastValue } = simpleAction;
+            const args = directive.references[0].split(":");
+            const reference = args.shift();
+            const newValue = getSimpleValue(getSimpleReference(reference, directive));
+            if (newValue !== lastValue) {
+                simpleAction.lastValue = newValue;
+                action(newValue);
+            }
+        });
+        setTimeout(watchMan, 200);
+    }
+    function createAction(directive, args) {
+        const { type, element, preReferences } = directive;
+        let action;
+        switch (type) {
+            case "if":
+                action = function (value) {
+                    if (value) {
+                        element.style.display = null;
+                        register(element);
+                    }
+                    else {
+                        element.style.display = "none";
+                        unregister(element);
+                    }
+                };
+                break;
+            case "for":
+            case "html":
+                action = function (value) {
+                    if (element.children.length) {
+                        Array.from(element.children).forEach(function (child) {
+                            unregister(child);
                         });
-                    };
-                    break;
-                case "class":
-                    action = function (value) {
-                        if (preReferences.length > 1) {
-                            preReferences.forEach(function (className) {
-                                if (!value) {
-                                    if (element.classList.contains(className)) {
-                                        element.classList.remove(className);
-                                    }
-                                }
-                                else if (!element.classList.contains(className)) {
-                                    element.classList.add(className);
-                                }
-                            });
+                    }
+                    element.innerHTML = value;
+                    if (element.children.length) {
+                        Array.from(element.children).forEach(function (child) {
+                            unregister(child);
+                        });
+                    }
+                };
+                break;
+            case "attr":
+                action = function (value) {
+                    preReferences.forEach(function (attribute) {
+                        if (typeof value === "undefined") {
+                            if (element.hasAttribute(attribute)) {
+                                element.removeAttribute(attribute);
+                            }
                         }
                         else {
-                            const className = preReferences[0];
+                            element.setAttribute(attribute, value);
+                        }
+                    });
+                };
+                break;
+            case "rdo":
+                action = function (value) {
+                    const radioInputs = Array.from(document.getElementsByName(element.getAttribute("name")));
+                    radioInputs.forEach(function (radioInput) {
+                        if (radioInput.value === value) {
+                            radioInput.checked = true;
+                        }
+                        else {
+                            radioInput.checked = false;
+                        }
+                    });
+                };
+                break;
+            case "class":
+                action = function (value) {
+                    if (preReferences.length > 1) {
+                        preReferences.forEach(function (className) {
                             if (!value) {
                                 if (element.classList.contains(className)) {
                                     element.classList.remove(className);
@@ -459,79 +334,184 @@ const simpleDirectives = {
                             else if (!element.classList.contains(className)) {
                                 element.classList.add(className);
                             }
+                        });
+                    }
+                    else {
+                        const className = preReferences[0];
+                        if (!value) {
+                            if (element.classList.contains(className)) {
+                                element.classList.remove(className);
+                            }
                         }
-                    };
-                    break;
-            }
-            return function (value) {
-                if (!element.parentElement) {
-                    simpleDirectives.registry.unregister(element);
-                    return;
-                }
-                if (typeof value === "function") {
-                    args = args.map(function (arg) {
-                        const argVal = simpleDirectives.references.convert(arg, directive);
-                        return argVal.parent[argVal.target];
-                    });
-                    value = value.apply(directive, args);
-                }
-                action(value);
-            };
-        },
-        removeNulls: function (arr) {
-            let index;
-            while ((index = arr.indexOf(null)) !== -1) {
-                arr.splice(index, 1);
-            }
+                        else if (!element.classList.contains(className)) {
+                            element.classList.add(className);
+                        }
+                    }
+                };
+                break;
         }
-    },
-    watchers: {
-        addAction: function (directive) {
-            const args = directive.references[0].split(":").slice(1);
-            const action = simpleDirectives.tools.createAction(directive, args);
-            directive.action = action;
-            simpleDirectives.watchers.cache.push({
-                action,
-                directive,
-                lastValue: false
-            });
-            if (!simpleDirectives.watchers.running) {
-                simpleDirectives.watchers.runner();
-                simpleDirectives.watchers.running = true;
+        return function (value) {
+            if (!element.parentElement) {
+                unregister(element);
+                return;
             }
-        },
-        cache: [],
-        removeAction: function (directive) {
-            simpleDirectives.watchers.cache = simpleDirectives.watchers.cache.map(function (simpleAction) {
-                if (simpleAction.action === directive.action) {
-                    return null;
+            if (typeof value === "function") {
+                args = args.map(function (arg) {
+                    const simpleReference = getSimpleReference(arg, directive);
+                    return simpleReference.parent[simpleReference.target];
+                });
+                value = value.apply(directive, args);
+            }
+            action(value);
+        };
+    }
+    /*
+     * REFERENCE PROCESSING
+     */
+    function getSimpleReference(reference, scope) {
+        const fallback = {
+            parent: {
+                value: reference
+            },
+            scope,
+            target: "value"
+        };
+        const hasBrackets = reference.indexOf("[") !== -1;
+        let args = reference.split(":");
+        let bang = false;
+        let hasDots;
+        let parent;
+        let target;
+        reference = args.shift();
+        hasDots = reference.indexOf(".") !== -1;
+        if (/[=<!>]/.test(reference)) {
+            if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
+                reference = reference.substring(1);
+                bang = true;
+            }
+            else {
+                const comparator = reference.match(/([=<!>]{2,3})/)[0];
+                if (is(comparator).oneOf(["==", "===", "!=", "!==", "<", ">", "<=", ">="])) {
+                    return getComparisonReference(comparator, reference, scope);
                 }
                 else {
-                    return simpleAction;
+                    return fallback;
                 }
-            });
-            simpleDirectives.tools.removeNulls(simpleDirectives.watchers.cache);
-        },
-        runner: function () {
-            simpleDirectives.watchers.cache.forEach(function (simpleAction) {
-                const { action, directive, lastValue } = simpleAction;
-                const args = directive.references[0].split(":");
-                const reference = args.shift();
-                const simpleReference = simpleDirectives.references.convert(reference, directive);
-                let newValue = simpleReference.parent[simpleReference.target];
-                if (typeof newValue === "function") {
-                    newValue = newValue.apply(directive, args);
+            }
+        }
+        if (/[^a-z0-9.[\]$_]/i.test(reference)) {
+            return fallback;
+        }
+        parent = Object.assign({}, window.simpleDirectives.root, scope);
+        if (!hasBrackets && !hasDots) {
+            if (parent.hasOwnProperty(reference)) {
+                target = reference;
+            }
+            else {
+                return fallback;
+            }
+        }
+        else {
+            if (hasBrackets) {
+                while (/\[[^\[\]]*\]/.test(reference)) {
+                    reference = reference.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
+                        const cr = getSimpleReference(capture, scope);
+                        return "." + cr.parent[cr.target];
+                    });
                 }
-                if (simpleReference.bang) {
-                    newValue = !newValue;
+                if (!hasDots) {
+                    hasDots = true;
                 }
-                if (newValue !== lastValue) {
-                    simpleAction.lastValue = newValue;
-                    action(newValue);
-                }
-            });
-            setTimeout(simpleDirectives.watchers.runner, 200);
-        },
-        running: false
+            }
+            if (hasDots) {
+                const parts = reference.split(".");
+                parts.some(function (part, index) {
+                    if (index === parts.length - 1) {
+                        target = part;
+                    }
+                    else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
+                        parent = parent[part];
+                    }
+                    else {
+                        parent = { value: reference };
+                        target = "value";
+                        return true;
+                    }
+                });
+            }
+        }
+        return { args, bang, parent, scope, target };
     }
-};
+    function getComparisonReference(comparator, reference, scope) {
+        const parts = reference.split(comparator);
+        const left = getSimpleValue(getSimpleReference(parts[0], scope));
+        const right = getSimpleValue(getSimpleReference(parts[1], scope));
+        let value;
+        switch (comparator) {
+            case "==":
+                value = left == right;
+                break;
+            case "===":
+                value = left === right;
+                break;
+            case "!=":
+                value = left != right;
+                break;
+            case "!==":
+                value = left != right;
+                break;
+            case "<":
+                value = left < right;
+                break;
+            case ">":
+                value = left > right;
+                break;
+            case "<=":
+                value = left <= right;
+                break;
+            case ">=":
+                value = left >= right;
+                break;
+        }
+        return {
+            parent: { value },
+            scope,
+            target: "value"
+        };
+    }
+    function getSimpleValue({ args, bang, parent, scope, target }) {
+        let value = parent[target];
+        if (typeof value === "function") {
+            value = value.apply(scope, args.map(function (arg) {
+                const simpleReference = getSimpleReference(arg, scope);
+                return simpleReference.parent[simpleReference.target];
+            }));
+        }
+        return bang ? !value : value;
+    }
+    /*
+     * UTILITIES
+     */
+    function is(target) {
+        return {
+            oneOf: function (arr) {
+                return arr.indexOf(target) !== -1;
+            }
+        };
+    }
+    function removeNulls(arr) {
+        let index;
+        while ((index = arr.indexOf(null)) !== -1) {
+            arr.splice(index, 1);
+        }
+    }
+    window.simpleDirectives = {
+        is,
+        register,
+        registry,
+        removeNulls,
+        root: window,
+        unregister,
+        watchers
+    };
+})();
