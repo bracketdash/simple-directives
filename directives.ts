@@ -452,7 +452,7 @@ interface SimpleAction {
                 reference = reference.substring(1);
                 bang = true;
             } else {
-                const comparator = reference.match(/([=<!>]{2,3})/)[0];
+                const comparator = reference.match(/([=<!>]{1,3})/)[0];
                 if (is(comparator).oneOf(["==", "===", "!=", "!==", "<", ">", "<=", ">="])) {
                     return getComparisonReference(comparator, reference, scope);
                 } else {
