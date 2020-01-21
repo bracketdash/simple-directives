@@ -276,19 +276,38 @@
                 break;
             case "for":
                 action = function ($collection) {
-                    if (element.children.length) {
+                    const currChildren = element.children.length;
+                    const difference = $collection.length - currChildren;
+                    const goalHTML = directive.originalHTML.repeat($collection.length);
+                    if (currChildren) {
                         Array.from(element.children).forEach(function (child) {
                             unregister(child);
                         });
                     }
-                    element.innerHTML = directive.originalHTML.repeat($collection.length);
-                    if (element.children.length) {
-                        Array.from(element.children).forEach(function (child, $index) {
-                            const scope = {};
-                            scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
-                            register(child, true, scope);
-                        });
+                    element.style.width = getComputedStyle(element).width;
+                    element.style.height = getComputedStyle(element).height;
+                    element.style.overflow = "hidden";
+                    if (difference < 0) {
+                        let countdown = Math.abs(difference);
+                        while (countdown > 0) {
+                            element.removeChild(element.lastChild);
+                            countdown -= 1;
+                        }
                     }
+                    else if (difference > 0) {
+                        element.innerHTML += directive.originalHTML.repeat(difference);
+                    }
+                    else if (element.innerHTML === goalHTML) {
+                        element.innerHTML = goalHTML;
+                    }
+                    Array.from(element.children).forEach(function (child, $index) {
+                        const scope = {};
+                        scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
+                        register(child, true, scope);
+                    });
+                    element.style.width = null;
+                    element.style.height = null;
+                    element.style.overflow = null;
                 };
                 break;
             case "html":
