@@ -56,9 +56,12 @@
             });
         }
     }
-    function unregister(target) {
+    function unregister(target, exceptIf) {
         window.simpleDirectives.registry = window.simpleDirectives.registry.map(function (directive) {
             let { element, type, preReferences, listener, action } = directive;
+            if (exceptIf && type === "if" && element === target) {
+                return directive;
+            }
             if (element === target || target.contains(element)) {
                 if (type === "on") {
                     preReferences.forEach(function (event) {
@@ -232,7 +235,7 @@
         }
     }
     function watchMan() {
-        window.simpleDirectives.watchers.forEach(function (simpleAction) {
+        window.simpleDirectives.watchers.forEach(function (simpleAction, index) {
             const { action, directive, lastValue } = simpleAction;
             const newValue = getSimpleValue(getSimpleReference(directive.references[0], directive));
             let newValueStr;
@@ -244,13 +247,13 @@
                     console.log(e);
                 }
                 if (newValueStr && newValueStr !== lastValue) {
-                    simpleAction.lastValue = newValueStr;
+                    window.simpleDirectives.watchers[index].lastValue = newValueStr;
                     action(newValue);
                 }
             }
             else if (newValue !== lastValue) {
-                simpleAction.lastValue = newValue;
                 action(newValue);
+                window.simpleDirectives.watchers[index].lastValue = newValue;
             }
         });
         setTimeout(watchMan, 200);
@@ -267,7 +270,7 @@
                     }
                     else {
                         element.style.display = "none";
-                        unregister(element);
+                        unregister(element, true);
                     }
                 };
                 break;

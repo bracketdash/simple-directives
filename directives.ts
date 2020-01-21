@@ -91,16 +91,21 @@ interface SimpleAction {
         }
     }
 
-    function unregister(target: HTMLElement) {
+    function unregister(target: HTMLElement, exceptIf?: boolean) {
         window.simpleDirectives.registry = window.simpleDirectives.registry.map(function(directive: SimpleDirective) {
             let { element, type, preReferences, listener, action } = directive;
+            if (exceptIf && type === "if" && element === target) {
+                return directive;
+            }
             if (element === target || target.contains(element)) {
                 if (type === "on") {
                     preReferences.forEach(function(event) {
                         element.removeEventListener(event, listener);
                     });
                 } else {
-                    window.simpleDirectives.watchers = window.simpleDirectives.watchers.map(function(simpleAction: SimpleAction) {
+                    window.simpleDirectives.watchers = window.simpleDirectives.watchers.map(function(
+                        simpleAction: SimpleAction
+                    ) {
                         if (simpleAction.action === action) {
                             return null;
                         } else {
@@ -276,7 +281,7 @@ interface SimpleAction {
     }
 
     function watchMan() {
-        window.simpleDirectives.watchers.forEach(function(simpleAction: SimpleAction) {
+        window.simpleDirectives.watchers.forEach(function(simpleAction: SimpleAction, index) {
             const { action, directive, lastValue } = simpleAction;
             const newValue: any = getSimpleValue(getSimpleReference(directive.references[0], directive));
             let newValueStr: string;
@@ -287,12 +292,12 @@ interface SimpleAction {
                     console.log(e);
                 }
                 if (newValueStr && newValueStr !== lastValue) {
-                    simpleAction.lastValue = newValueStr;
+                    window.simpleDirectives.watchers[index].lastValue = newValueStr;
                     action(newValue);
                 }
             } else if (newValue !== lastValue) {
-                simpleAction.lastValue = newValue;
                 action(newValue);
+                window.simpleDirectives.watchers[index].lastValue = newValue;
             }
         });
         setTimeout(watchMan, 200);
@@ -309,7 +314,7 @@ interface SimpleAction {
                         register(element);
                     } else {
                         element.style.display = "none";
-                        unregister(element);
+                        unregister(element, true);
                     }
                 };
                 break;
