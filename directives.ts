@@ -44,7 +44,7 @@ interface SimpleAction {
      * DIRECTIVE REGISTRATION
      * * * * * * * * * * * * */
 
-    function register(element: HTMLElement, skipUnregister?: boolean, scope?: object, skipIf?: boolean) {
+    function register(element: HTMLElement, skipUnregister?: boolean, scope?: object) {
         let attributeValue: string;
         let directiveName: string;
         let expressions: string[];
