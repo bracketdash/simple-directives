@@ -1,5 +1,11 @@
 let SimpleDirectives;
 (function(SimpleDirectives) {
+    // SECTIONS:
+    // > Main Classes
+    // > Data Binds
+    // > Event Listening & Handling
+    // > References
+    
     function is(target: any) {
         return {
             oneOf: function(arr: any[]): boolean {
@@ -15,7 +21,7 @@ let SimpleDirectives;
         }
     }
 
-    // MAIN CLASSES
+    // > MAIN CLASSES
     // ============================================================================
 
     class Registrar {
@@ -44,8 +50,7 @@ let SimpleDirectives;
             }
         }
         runner() {
-            this.references = this.references.map((reference: SimpleReference) => reference.run());
-            removeNulls(this.references);
+            this.references.forEach((reference: SimpleReference) => reference.run());
             setTimeout(this.runner, 200);
         }
         unregister(target: HTMLElement) {
@@ -80,15 +85,11 @@ let SimpleDirectives;
         unregister() {
             const directiveTypes = this.directives.map(directive => directive.type);
             if (is("on").oneOf(directiveTypes)) {
-                let listeners: SimpleListener[];
-                this.directives.some(directive => {
+                this.directives.some((directive: SimpleDirective) => {
                     if (directive.type === "on") {
-                        listeners = directive.listeners;
+                        directive.listeners.forEach(listener => listener.destroy());
                         return true;
                     }
-                });
-                listeners.forEach(() => {
-                    // TODO: remove event listeners from element
                 });
             }
             this.instance.references = this.instance.references.map((reference: SimpleReference) => {
@@ -144,54 +145,7 @@ let SimpleDirectives;
         }
     }
 
-    class SimpleListener {
-        actions: SimpleAction[];
-        directive: SimpleDirective;
-        elo: EventListenerObject[];
-        events: string[];
-        raw: string;
-        constructor(directive: SimpleDirective, raw: string) {
-            // RAW: event,event,..:reference[:arg:arg:..][,reference[:arg:arg:..,..]]
-            const rawParts = raw.split(":");
-            this.directive = directive;
-            this.events = rawParts[0].split(",");
-            this.raw = raw;
-            this.actions = rawParts
-                .join(":")
-                .split(",")
-                .map(
-                    (rawAction: string): SimpleAction => {
-                        if (rawAction === "$update") {
-                            return this.getUpdater();
-                        } else if (rawAction.indexOf("=") !== -1) {
-                            return new SimpleAssigner(this, rawAction);
-                        } else {
-                            return new SimpleCaller(this, rawAction);
-                        }
-                    }
-                );
-        }
-        destroy() {
-            // TODO
-        }
-        getUpdater(): SimpleUpdater {
-            const element = this.directive.element;
-            const directiveTypes = element.directives.map(directive => directive.type);
-            if (is("attr").oneOf(directiveTypes)) {
-                if (element.raw.tagName === "INPUT" && is(element.raw.getAttribute("type")).oneOf(["checkbox", "radio"])) {
-                    return new CheckedUpdater(this);
-                } else {
-                    return new ValueUpdater(this);
-                }
-            } else if (is("html").oneOf(directiveTypes) && element.raw.isContentEditable) {
-                return new ContentEditableUpdater(this);
-            } else if (is("rdo").oneOf(directiveTypes)) {
-                return new RadioUpdater(this);
-            }
-        }
-    }
-
-    // EXPRESSION CLASSES
+    // > DATA BINDS
     // ============================================================================
 
     class SimpleExpression {
@@ -207,12 +161,7 @@ let SimpleDirectives;
             }
         }
         assignReference(raw: string): SimpleReference {
-            let reference: SimpleReference;
-            if (/[=<!>]/.test(raw.substring(1))) {
-                reference = new SimpleComparison(this, raw);
-            } else {
-                reference = new SimplePointer(this, raw);
-            }
+            const reference = SimpleReference.getReference(this, raw);
             this.directive.element.instance.references.push(reference);
             return reference;
         }
@@ -277,63 +226,59 @@ let SimpleDirectives;
             // TODO
         }
     }
-
-    // REFERENCE CLASSES
+    
+    // EVENT LISTENING & HANDLING
     // ============================================================================
 
-    class SimpleReference {
-        key: string;
-        obj: object;
-        parent: SimpleExpression | SimpleReference | SimpleAction;
+    class SimpleListener {
+        actions: SimpleAction[];
+        directive: SimpleDirective;
+        elo: EventListenerObject;
+        events: string[];
         raw: string;
-        value: any;
-        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
-            this.parent = parent;
-            this.raw = raw;
-        }
-        run() {
-            return null;
-        }
-    }
-
-    class SimplePointer extends SimpleReference {
-        args: SimplePointer[];
-        base: string;
-        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
-            // RAW: reference[:arg:arg:..]
+        constructor(directive: SimpleDirective, raw: string) {
+            // RAW: event,event,..:reference[:arg:arg:..][,reference[:arg:arg:..,..]]
             const rawParts = raw.split(":");
-            super(parent, raw);
-            this.base = rawParts.shift();
-            this.args = rawParts.map(rawPart => new SimplePointer(this, rawPart));
+            this.directive = directive;
+            this.events = rawParts[0].split(",");
+            this.raw = raw;
+            this.actions = rawParts
+                .join(":")
+                .split(",")
+                .map(
+                    (rawAction: string): SimpleAction => {
+                        if (rawAction === "$update") {
+                            return this.getUpdater();
+                        } else if (rawAction.indexOf("=") !== -1) {
+                            return new SimpleAssigner(this, rawAction);
+                        } else {
+                            return new SimpleCaller(this, rawAction);
+                        }
+                    }
+                );
         }
-        run() {
-            // TODO: should remove expression from element and return null if no longer valid
-            return this;
+        destroy() {
+            this.events.forEach((event: string) => {
+                this.directive.element.raw.removeEventListener(event, this.elo);
+            });
+        }
+        getUpdater(): SimpleUpdater {
+            const element = this.directive.element;
+            const directiveTypes = element.directives.map(directive => directive.type);
+            if (is("attr").oneOf(directiveTypes)) {
+                if (element.raw.tagName === "INPUT" && is(element.raw.getAttribute("type")).oneOf(["checkbox", "radio"])) {
+                    return new CheckedUpdater(this);
+                } else {
+                    return new ValueUpdater(this);
+                }
+            } else if (is("html").oneOf(directiveTypes) && element.raw.isContentEditable) {
+                return new ContentEditableUpdater(this);
+            } else if (is("rdo").oneOf(directiveTypes)) {
+                return new RadioUpdater(this);
+            }
         }
     }
-
-    class SimpleComparison extends SimpleReference {
-        left: SimplePointer;
-        comparator: string;
-        right: SimplePointer;
-        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
-            // RAW: reference[:arg:arg:..](comparator)reference[:arg:arg:..]
-            const comparator = raw.match(/([=<!>]{1,3})/)[0];
-            const index = raw.indexOf(comparator);
-            super(parent, raw);
-            this.comparator = comparator;
-            this.left = new SimplePointer(this, raw.substring(0, index));
-            this.right = new SimplePointer(this, raw.substring(index + comparator.length));
-        }
-        run() {
-            // TODO: should remove expression from element and return null if no longer valid
-            return this;
-        }
-    }
-
-    // ACTION CLASSES (RUN ON USER INTERACTION; SET UP BY SD-ON)
-    // ============================================================================
-
+    
     class SimpleAction {
         listener: SimpleListener;
         raw?: string;
@@ -343,13 +288,6 @@ let SimpleDirectives;
                 this.raw = raw;
             }
         }
-        getReference(raw: string): SimpleReference {
-            if (/[=<!>]/.test(raw.substring(1))) {
-                return new SimpleComparison(this, raw);
-            } else {
-                return new SimplePointer(this, raw);
-            }
-        }
     }
 
     class SimpleCaller extends SimpleAction {
@@ -357,7 +295,7 @@ let SimpleDirectives;
         constructor(listener: SimpleListener, raw: string) {
             // RAW: reference[:arg:arg:..]
             super(listener, raw);
-            this.callee = this.getReference(raw);
+            this.callee = SimpleReference.getReference(this ,raw);
         }
         run() {
             // TODO
@@ -371,13 +309,15 @@ let SimpleDirectives;
             // RAW: reference=reference[:arg:arg:..]
             const rawParts = raw.split("=");
             super(listener, raw);
-            this.left = this.getReference(rawParts.shift());
-            this.right = this.getReference(rawParts[0]);
+            this.left = SimpleReference.getReference(this, rawParts.shift());
+            this.right = SimpleReference.getReference(this, rawParts[0]);
         }
         run() {
             // TODO
         }
     }
+    
+    // UPDATER CLASSES
 
     class SimpleUpdater extends SimpleAction {
         updatee: SimpleReference;
@@ -407,7 +347,94 @@ let SimpleDirectives;
         }
     }
 
-    // INIT
+    // REFERENCE CLASSES
+    // ============================================================================
+
+    class SimpleReference {
+        parent: SimpleExpression | SimpleReference | SimpleAction;
+        raw: string;
+        value: any;
+        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
+            this.parent = parent;
+            this.raw = raw;
+        }
+        get() { /* leave me be */ }
+        run() { /* leave me be */ }
+        static getReference(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
+            let reference: SimpleReference;
+            // TODO: add to conditions - assign one of:
+            // SimpleComparison (SimpleReference)
+            // ScopePointer (SimplePointer (SimpleReference))
+            // RootPointer (SimplePointer (SimpleReference))
+            if (/[=<!>]/.test(raw.substring(1))) {
+                reference = new SimpleComparison(parent, raw);
+            } else {
+                reference = new SimplePointer(parent, raw);
+            }
+            return reference;
+        }
+    }
+
+    class SimpleComparison extends SimpleReference {
+        left: SimpleReference;
+        comparator: string;
+        right: SimpleReference;
+        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
+            // RAW: reference[:arg:arg:..](comparator)reference[:arg:arg:..]
+            const comparator = raw.match(/([=<!>]{1,3})/)[0];
+            const index = raw.indexOf(comparator);
+            super(parent, raw);
+            this.comparator = comparator;
+            this.left = SimpleReference.getReference(this, raw.substring(0, index));
+            this.right = SimpleReference.getReference(this, raw.substring(index + comparator.length));
+        }
+        run() {
+            // TODO
+        }
+    }
+    
+    class SimplePointer extends SimpleReference {
+        base: string;
+        bang: boolean;
+        args: SimpleReference[];
+        obj: object;
+        key: string;
+        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
+            // RAW: reference[:arg:arg:..]
+            const rawParts = raw.split(":");
+            super(parent, raw);
+            this.base = rawParts.shift();
+            if (this.base.startsWith("!")) {
+                this.base = this.base.substring(1);
+                this.bang = true;
+            }
+            this.args = rawParts.map(rawPart => SimpleReference.getReference(this, rawPart));
+            // TODO: set this.obj and this.key
+        }
+        get() {
+            let value: any = this.obj[this.key];
+            if (typeof value === "function") {
+                value = value.apply("TODO: SCOPE", this.args.map(arg => arg.get()));
+            }
+            return this.bang ? value : !value;
+        }
+    }
+    
+    class ScopePointer extends SimplePointer {
+        // TODO
+        run() {
+            // TODO
+        }
+    }
+    
+    class RootPointer extends SimplePointer {
+        // TODO
+        run() {
+            // TODO
+        }
+    }
+
+    // > INITIALIZATION
     // ============================================================================
 
     SimpleDirectives.register = (element?: HTMLElement, root?: object) => new Registrar(element, root);
