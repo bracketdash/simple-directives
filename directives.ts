@@ -1,7 +1,5 @@
 let SimpleDirectives;
 (function(SimpleDirectives) {
-    // UTILITIES
-
     function is(target: any) {
         return {
             oneOf: function(arr: any[]): boolean {
@@ -17,7 +15,8 @@ let SimpleDirectives;
         }
     }
 
-    // CLASSES
+    // MAIN CLASSES
+    // ============================================================================
 
     class Registrar {
         elements: SimpleElement[] = [];
@@ -31,7 +30,7 @@ let SimpleDirectives;
         register(target: HTMLElement) {
             let hasDirective = false;
             let element: SimpleElement;
-            ["attr", "class", "for", "html", "if", "on", "rdo"].some(function(type: string) {
+            ["attr", "class", "for", "html", "if", "on", "rdo"].some((type: string) => {
                 if (target.hasAttribute(`sd-${type}`)) {
                     hasDirective = true;
                 }
@@ -45,15 +44,19 @@ let SimpleDirectives;
             }
         }
         runner() {
-            // TODO
+            this.references = this.references.map((reference: SimpleReference) => reference.run());
+            removeNulls(this.references);
             setTimeout(this.runner, 200);
         }
         unregister(target: HTMLElement) {
-            this.elements.forEach(function(element: SimpleElement) {
+            this.elements = this.elements.map((element: SimpleElement) => {
                 if (target.contains(element.raw)) {
-                    element.unregister();
+                    return element.unregister();
+                } else {
+                    return element;
                 }
             });
+            removeNulls(this.elements);
         }
     }
 
@@ -75,7 +78,32 @@ let SimpleDirectives;
             });
         }
         unregister() {
-            // TODO
+            const directiveTypes = this.directives.map(directive => directive.type);
+            if (is("on").oneOf(directiveTypes)) {
+                let listeners: SimpleListener[];
+                this.directives.some(directive => {
+                    if (directive.type === "on") {
+                        listeners = directive.listeners;
+                        return true;
+                    }
+                });
+                listeners.forEach(() => {
+                    // TODO: remove event listeners from element
+                });
+            }
+            this.instance.references = this.instance.references.map((reference: SimpleReference) => {
+                let parent: SimpleExpression | SimpleReference | SimpleAction = reference;
+                while (parent instanceof SimpleReference) {
+                    parent = parent.parent;
+                }
+                if (parent instanceof SimpleExpression && this.raw.contains(parent.directive.element.raw)) {
+                    return null;
+                } else {
+                    return reference;
+                }
+            });
+            removeNulls(this.instance.references);
+            return null;
         }
     }
 
@@ -86,7 +114,6 @@ let SimpleDirectives;
         raw: string;
         type: string;
         constructor(element: SimpleElement, type: string, raw: string) {
-            // RAW RECEIVED: Directive value without spaces
             const rawExpressions = raw.split(";");
             this.raw = raw;
             this.type = type;
@@ -150,24 +177,23 @@ let SimpleDirectives;
         getUpdater(): SimpleUpdater {
             const element = this.directive.element;
             const directiveTypes = element.directives.map(directive => directive.type);
-            if (is("sd-attr").oneOf(directiveTypes)) {
+            if (is("attr").oneOf(directiveTypes)) {
                 if (element.raw.tagName === "INPUT" && is(element.raw.getAttribute("type")).oneOf(["checkbox", "radio"])) {
                     return new CheckedUpdater(this);
                 } else {
                     return new ValueUpdater(this);
                 }
-            } else if (is("sd-html").oneOf(directiveTypes) && element.raw.isContentEditable) {
+            } else if (is("html").oneOf(directiveTypes) && element.raw.isContentEditable) {
                 return new ContentEditableUpdater(this);
-            } else if (is("sd-rdo").oneOf(directiveTypes)) {
+            } else if (is("rdo").oneOf(directiveTypes)) {
                 return new RadioUpdater(this);
             }
         }
     }
 
-    // EXPRESSIONS
+    // EXPRESSION CLASSES
     // ============================================================================
 
-    // BASE CLASS
     class SimpleExpression {
         raw: string;
         directive: SimpleDirective;
@@ -252,10 +278,9 @@ let SimpleDirectives;
         }
     }
 
-    // REFERENCES
+    // REFERENCE CLASSES
     // ============================================================================
 
-    // BASE CLASS
     class SimpleReference {
         key: string;
         obj: object;
@@ -265,6 +290,9 @@ let SimpleDirectives;
         constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
             this.parent = parent;
             this.raw = raw;
+        }
+        run() {
+            return null;
         }
     }
 
@@ -278,8 +306,9 @@ let SimpleDirectives;
             this.base = rawParts.shift();
             this.args = rawParts.map(rawPart => new SimplePointer(this, rawPart));
         }
-        refresh() {
-            // TODO
+        run() {
+            // TODO: should remove expression from element and return null if no longer valid
+            return this;
         }
     }
 
@@ -296,15 +325,15 @@ let SimpleDirectives;
             this.left = new SimplePointer(this, raw.substring(0, index));
             this.right = new SimplePointer(this, raw.substring(index + comparator.length));
         }
-        refresh() {
-            // TODO
+        run() {
+            // TODO: should remove expression from element and return null if no longer valid
+            return this;
         }
     }
 
-    // ACTIONS
+    // ACTION CLASSES (RUN ON USER INTERACTION; SET UP BY SD-ON)
     // ============================================================================
 
-    // BASE CLASS
     class SimpleAction {
         listener: SimpleListener;
         raw?: string;
@@ -353,25 +382,25 @@ let SimpleDirectives;
     class SimpleUpdater extends SimpleAction {
         updatee: SimpleReference;
     }
-    
+
     class ValueUpdater extends SimpleUpdater {
         run() {
             // TODO
         }
     }
-    
+
     class CheckedUpdater extends SimpleUpdater {
         run() {
             // TODO
         }
     }
-    
+
     class ContentEditableUpdater extends SimpleUpdater {
         run() {
             // TODO
         }
     }
-    
+
     class RadioUpdater extends SimpleUpdater {
         run() {
             // TODO
@@ -379,6 +408,7 @@ let SimpleDirectives;
     }
 
     // INIT
+    // ============================================================================
 
     SimpleDirectives.register = (element?: HTMLElement, root?: object) => new Registrar(element, root);
 })(SimpleDirectives);
