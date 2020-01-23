@@ -4,13 +4,15 @@
 <script src="directives.min.js"></script>
 ```
 
-Register directives on `element` and all children:
-
 ```javascript
-simpleDirectives.register(element);
+simpleDirectives.register(element, root);
 ```
 
-Usage:
+Both `element` and `root` are optional and will default to `document.body` and `window`.
+
+All children of `element` will also be registered.
+
+An instance of `SimpleDirectivesRegistrar` will be returned.
 
 ```html
 <element directive="expression" />

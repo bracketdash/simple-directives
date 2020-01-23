@@ -1,5 +1,5 @@
-let SimpleDirectives;
-(function(SimpleDirectives) {
+const simpleDirectives: any = {};
+(function(simpleDirectives) {
     // SECTIONS:
     // > Main Classes
     // > Data Binds
@@ -24,7 +24,7 @@ let SimpleDirectives;
     // > MAIN CLASSES
     // ============================================================================
 
-    class Registrar {
+    class SimpleDirectivesRegistrar {
         elements: SimpleElement[] = [];
         references: SimpleReference[] = [];
         root: object;
@@ -68,10 +68,10 @@ let SimpleDirectives;
     class SimpleElement {
         directives: SimpleDirective[] = [];
         hasFalseIf: boolean;
-        instance: Registrar;
+        instance: SimpleDirectivesRegistrar;
         raw: HTMLElement;
         scope: object;
-        constructor(instance: Registrar, element: HTMLElement) {
+        constructor(instance: SimpleDirectivesRegistrar, element: HTMLElement) {
             this.instance = instance;
             this.raw = element;
             // IMPORTANT: `if` must be first; `for` must be second; `on` must be last
@@ -451,5 +451,5 @@ let SimpleDirectives;
     // > INITIALIZATION
     // ============================================================================
 
-    SimpleDirectives.register = (element?: HTMLElement, root?: object) => new Registrar(element, root);
-})(SimpleDirectives);
+    simpleDirectives.register = (element?: HTMLElement, root?: object) => new SimpleDirectivesRegistrar(element, root);
+})(simpleDirectives);
