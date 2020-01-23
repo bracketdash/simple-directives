@@ -41,7 +41,7 @@ const simpleDirectives = {};
                 this.elements.push(element);
             }
             if (!element || !element.hasFalseIf) {
-                Array.from(target.children).forEach((child) => this.register(child));
+                Array.from(target.children).forEach((child) => this.register(child, scope));
             }
         }
         runner() {
@@ -52,7 +52,7 @@ const simpleDirectives = {};
         }
         unregister(target) {
             this.elements = this.elements.map((element) => {
-                if (target.contains(element.raw)) {
+                if (element.raw === target || target.contains(element.raw)) {
                     return element.unregister();
                 }
                 else {
@@ -60,6 +60,16 @@ const simpleDirectives = {};
                 }
             });
             removeNulls(this.elements);
+        }
+        getSimpleElement(target) {
+            let simpleElement;
+            this.elements.some((element) => {
+                if (element.raw === target) {
+                    simpleElement = element;
+                    return true;
+                }
+            });
+            return simpleElement;
         }
     }
     class SimpleElement {
@@ -245,7 +255,7 @@ const simpleDirectives = {};
                 element.innerHTML += this.originalHTML.repeat(difference);
             }
             Array.from(element.children).some((child, $index) => {
-                const scope = this.directive.element.scope;
+                const scope = Object.assign({}, this.directive.element.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
                 simpleElement.instance.register(child, scope);
             });
@@ -295,7 +305,7 @@ const simpleDirectives = {};
             // RAW: event,event,..:reference[:arg:arg:..][,reference[:arg:arg:..,..]]
             let rawParts = raw.split(":");
             this.directive = directive;
-            this.events = rawParts[0].split(",");
+            this.events = rawParts.shift().split(",");
             this.raw = raw;
             rawParts = rawParts.join(":").split(",");
             this.actions = rawParts.map((rawAction) => {
@@ -495,16 +505,28 @@ const simpleDirectives = {};
                 this.base = this.base.substring(1);
             }
             this.args = rawParts.map(rawPart => SimpleReference.getReference(this, rawPart));
-            const scope = (() => {
-                const bubbler = SimpleReference.bubbleUp(parent);
-                if (bubbler instanceof SimpleAction) {
-                    return bubbler.listener.directive.element.scope;
-                }
-                else {
-                    return bubbler.directive.element.scope;
-                }
-            })();
-            let objAndKey = this.maybeGetObjAndKey(this.base, scope);
+            let directive = SimpleReference.bubbleUp(this.parent);
+            if (directive instanceof SimpleAction) {
+                directive = directive.listener.directive;
+            }
+            else {
+                directive = directive.directive;
+            }
+            this.scope = directive.element.scope;
+            this.scope.element = directive.element.raw;
+            if (directive instanceof SdAttr) {
+                this.scope.attributeName = directive.attribute;
+            }
+            else if (directive instanceof SdClass) {
+                this.scope.classNames = directive.classes;
+            }
+            else if (directive instanceof SdFor) {
+                this.scope.itemName = directive.alias;
+            }
+            else if (directive instanceof SimpleListener) {
+                this.scope.eventNames = directive.events;
+            }
+            let objAndKey = this.maybeGetObjAndKey(this.base, this.scope);
             if (objAndKey.nah) {
                 objAndKey = this.maybeGetObjAndKey(this.base);
             }
@@ -518,7 +540,6 @@ const simpleDirectives = {};
         }
         get(additionalScope) {
             let directive = SimpleReference.bubbleUp(this.parent);
-            let scope = this.scope();
             let value = this.obj[this.key];
             if (directive instanceof SimpleExpression) {
                 directive = directive.directive;
@@ -526,32 +547,15 @@ const simpleDirectives = {};
             else {
                 directive = directive.listener.directive;
             }
-            scope.element = directive.element.raw;
-            if (directive instanceof SdAttr) {
-                scope.attributeName = directive.attribute;
-            }
-            else if (directive instanceof SdClass) {
-                scope.classNames = directive.classes;
-            }
-            else if (directive instanceof SdFor) {
-                scope.itemName = directive.alias;
-            }
-            else if (directive instanceof SimpleListener) {
-                scope.eventNames = directive.events;
-            }
+            let scope = this.scope;
             if (additionalScope) {
-                Object.assign(scope, additionalScope);
+                scope = Object.assign({}, scope, additionalScope);
             }
             if (typeof value === "function") {
-                value = value.apply(scope, this.args.map(arg => arg.get(additionalScope)));
+                const argValues = this.args.map(arg => arg.get(additionalScope));
+                value = value.apply(scope, argValues);
             }
             return this.bang ? !value : value;
-        }
-        scope() {
-            const parent = SimpleReference.bubbleUp(this.parent);
-            return parent instanceof SimpleAction
-                ? parent.listener.directive.element.scope
-                : parent.directive.element.scope;
         }
         maybeGetObjAndKey(base, scope) {
             const fallback = { nah: true };
