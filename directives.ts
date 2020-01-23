@@ -392,6 +392,11 @@ const simpleDirectives: any = {};
         }
     }
     
+    interface ObjAndKey {
+        key?: string;
+        nah?: boolean;
+        obj?: object;
+    }
     class SimplePointer extends SimpleReference {
         args: SimpleReference[];
         bang: boolean;
@@ -418,40 +423,36 @@ const simpleDirectives: any = {};
                     return bubbler.directive.element.scope;
                 }
             }();
-            
-            // TODO: START HERE
-            
-            // try to assign parent in the scope first - if it works, reassign obj and key, then: reference = new ScopePointer(parent, raw, obj, key)
-            let objAndKey = SimpleReference.maybeGetObjAndKey(scope, base);
-            // if we can't, try on the root - if it works, reassign obj and key, then: reference = new RootPointer(parent, raw, obj, key)
+            let objAndKey: ObjAndKey = this.maybeGetObjAndKey(scope);
             if (!objAndKey) {
-                objAndKey = SimpleReference.maybeGetObjAndKey(scope, base);
+                objAndKey = this.maybeGetObjAndKey(scope);
             }
             if (objAndKey) {
-                //
+                this.obj = objAndKey.obj;
+                this.key = objAndKey.key;
             }
+        }
+        get() {
+            let value: any = this.obj[this.key];
+            if (typeof value === "function") {
+                value = value.apply(this.scope(), this.args.map(arg => arg.get()));
+            }
+            return this.bang ? value : !value;
+        }
+        scope() {
+            const parent: SimpleExpression | SimpleAction = SimpleReference.bubbleUp(this.parent);
+            return parent instanceof SimpleAction ? parent.listener.directive.element.scope : parent.directive.element.scope;
+        }
+        maybeGetObjAndKey(scope: object): ObjAndKey {
+            // TODO: START HERE
+            // reference => this.base
+            // parent => obj
+            // target => key
             /*
             const hasBrackets = reference.indexOf("[") !== -1;
-            let args = reference.split(":");
-            let bang = false;
             let hasDots: boolean;
             let parent: object = window.simpleDirectives.root;
-            let target: string;
-            reference = args.shift();
             hasDots = reference.indexOf(".") !== -1;
-            if (/[=<!>]/.test(reference)) {
-                if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
-                    reference = reference.substring(1);
-                    bang = true;
-                } else {
-                    const comparator = reference.match(/([=<!>]{1,3})/)[0];
-                    if (is(comparator).oneOf(["==", "===", "!=", "!==", "<", ">", "<=", ">="])) {
-                        return getComparisonReference(comparator, reference, scope);
-                    } else {
-                        return fallback;
-                    }
-                }
-            }
             if (/[^a-z0-9.[\]$_]/i.test(reference)) {
                 return fallback;
             }
@@ -507,20 +508,7 @@ const simpleDirectives: any = {};
                 }
             }
             */
-        }
-        get() {
-            let value: any = this.obj[this.key];
-            if (typeof value === "function") {
-                value = value.apply(this.scope(), this.args.map(arg => arg.get()));
-            }
-            return this.bang ? value : !value;
-        }
-        scope() {
-            const parent: SimpleExpression | SimpleAction = SimpleReference.bubbleUp(this.parent);
-            return parent instanceof SimpleAction ? parent.listener.directive.element.scope : parent.directive.element.scope;
-        }
-        static maybeGetObjAndKey(scope: object, raw: string): object | boolean {
-            // TODO
+            return { nah: true };
         }
     }
 
