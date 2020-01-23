@@ -62,7 +62,7 @@ Multiple comma-separated classes are allowed.
 Reference Scope:
 
 -   `element`
--   `className`
+-   `classNames`
 
 The reference can be a comparison of two references.
 
@@ -123,7 +123,8 @@ Multiple comma-separated references are allowed.
 Reference Scope:
 
 -   `element`
--   `event`
+-   `eventNames`
+-   `event` (only available when event fires)
 
 The reference should be a function or:
 

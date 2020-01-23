@@ -240,7 +240,8 @@ const simpleDirectives: any = {};
             this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
-            // TODO: refactor below
+            // TODO
+            // make sure each element under this gets a fresh scope assigned (respect existing scopes from other fors)
             /*
             const currChildren = element.children.length;
             const difference = $collection.length - currChildren;
@@ -386,7 +387,7 @@ const simpleDirectives: any = {};
             this.callee = (SimpleReference.getReference(this, raw) as SimplePointer);
         }
         run(event: Event) {
-            this.callee.get(event);
+            this.callee.get({ event });
         }
     }
 
@@ -575,14 +576,27 @@ const simpleDirectives: any = {};
             }
         }
         get(additionalScope?: object) {
-            let scope: object = this.scope();
+            let directive: any = SimpleReference.bubbleUp(this.parent);
+            let scope: any = this.scope();
             let value: any = this.obj[this.key];
+            if (directive instanceof SimpleExpression) {
+                directive = (directive as SimpleExpression).directive;
+            } else {
+                directive = (directive as SimpleAction).listener.directive;
+            }
+            scope.element = directive.element.raw;
+            if (directive instanceof SdAttr) {
+                scope.attributeName = directive.attribute;
+            } else if (directive instanceof SdClass) {
+                scope.classNames = directive.classes;
+            } else if (directive instanceof SdFor) {
+                scope.itemName = directive.alias;
+            } else if (directive instanceof SimpleListener) {
+                scope.eventNames = directive.events;
+            }
             if (additionalScope) {
                 Object.assign(scope, additionalScope);
-            } else {
-                additionalScope = {};
             }
-            // TODO: make sure all the right data is getting into scope according to the README
             if (typeof value === "function") {
                 value = value.apply(scope, this.args.map(arg => arg.get(additionalScope)));
             }
