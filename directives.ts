@@ -33,7 +33,7 @@ const simpleDirectives: any = {};
             this.register(element ? element : document.body);
             this.runner();
         }
-        register(target: HTMLElement) {
+        register(target: HTMLElement, scope?: object) {
             let hasDirective = false;
             let element: SimpleElement;
             ["attr", "class", "for", "html", "if", "on", "rdo"].some((type: string) => {
@@ -42,7 +42,7 @@ const simpleDirectives: any = {};
                 }
             });
             if (hasDirective && !is(target).oneOf(this.elements)) {
-                element = new SimpleElement(this, target);
+                element = new SimpleElement(this, target, scope);
                 this.elements.push(element);
             }
             if (!element || !element.hasFalseIf) {
@@ -71,9 +71,10 @@ const simpleDirectives: any = {};
         instance: SimpleDirectivesRegistrar;
         raw: HTMLElement;
         scope: object;
-        constructor(instance: SimpleDirectivesRegistrar, element: HTMLElement) {
+        constructor(instance: SimpleDirectivesRegistrar, element: HTMLElement, scope?: object) {
             this.instance = instance;
             this.raw = element;
+            this.scope = scope ? scope : {};
             // IMPORTANT: `if` must be first; `for` must be second; `on` must be last
             ["if", "for", "attr", "class", "html", "rdo", "on"].some((type: string) => {
                 const attributeValue = element.getAttribute(`sd-${type}`);
@@ -241,7 +242,7 @@ const simpleDirectives: any = {};
         }
         run(value: any) {
             // TODO
-            // make sure each element under this gets a fresh scope assigned (respect existing scopes from other fors)
+            // create the scope object and provide it to the register function
             /*
             const currChildren = element.children.length;
             const difference = $collection.length - currChildren;
