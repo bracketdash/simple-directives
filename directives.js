@@ -7,7 +7,7 @@ const simpleDirectives = {};
     // > References
     function is(target) {
         return {
-            oneOf: function (arr) {
+            oneOf(arr) {
                 return arr.indexOf(target) !== -1;
             }
         };
@@ -46,7 +46,9 @@ const simpleDirectives = {};
         }
         runner() {
             this.references.forEach((reference) => reference.run());
-            setTimeout(this.runner, 200);
+            setTimeout(() => {
+                this.runner();
+            }, 200);
         }
         unregister(target) {
             this.elements = this.elements.map((element) => {
@@ -170,7 +172,7 @@ const simpleDirectives = {};
         run(value) {
             const element = this.directive.element.raw;
             if (this.attribute === "value" && element.tagName === "SELECT") {
-                Array.from(element.getElementsByTagName("option")).forEach(function (optionElement) {
+                Array.from(element.getElementsByTagName("option")).forEach((optionElement) => {
                     if ((Array.isArray(value) && is(optionElement.value).oneOf(value)) || value == optionElement.value) {
                         optionElement.selected = true;
                     }
@@ -199,7 +201,7 @@ const simpleDirectives = {};
         }
         run(value) {
             const element = this.directive.element.raw;
-            this.classes.forEach(function (className) {
+            this.classes.forEach(className => {
                 if (!value) {
                     if (element.classList.contains(className)) {
                         element.classList.remove(className);
@@ -242,8 +244,8 @@ const simpleDirectives = {};
             else if (difference > 0) {
                 element.innerHTML += this.originalHTML.repeat(difference);
             }
-            Array.from(element.children).some(function (child, $index) {
-                const scope = this.element.scope;
+            Array.from(element.children).some((child, $index) => {
+                const scope = this.directive.element.scope;
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
                 simpleElement.instance.register(child, scope);
             });
@@ -253,9 +255,7 @@ const simpleDirectives = {};
                     if (directive.type === "attr") {
                         directive.expressions.some((sdAttr) => {
                             if (sdAttr.attribute === "value") {
-                                setTimeout(function () {
-                                    sdAttr.run(sdAttr.reference.get());
-                                });
+                                setTimeout(() => sdAttr.run(sdAttr.reference.get()));
                                 return true;
                             }
                         });
@@ -278,7 +278,7 @@ const simpleDirectives = {};
         run(value) {
             const groupName = this.directive.element.raw.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
-            radioInputs.forEach(function (radioInput) {
+            radioInputs.forEach((radioInput) => {
                 if (radioInput.value === value) {
                     radioInput.checked = true;
                 }
@@ -397,7 +397,7 @@ const simpleDirectives = {};
             const groupName = this.listener.directive.element.raw.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
             let value;
-            radioInputs.some(function (radioInput) {
+            radioInputs.some((radioInput) => {
                 if (radioInput.checked) {
                     value = radioInput.value;
                     return true;
@@ -418,11 +418,12 @@ const simpleDirectives = {};
         }
         run() {
             let currentValue = this.get();
-            if (typeof currentValue === "object") {
-                currentValue = JSON.stringify(currentValue);
+            let tester = currentValue;
+            if (typeof tester === "object") {
+                tester = JSON.stringify(tester);
             }
-            if (currentValue !== this.value) {
-                this.value = currentValue;
+            if (tester !== this.value) {
+                this.value = tester;
                 SimpleReference.bubbleUp(this).run(currentValue);
             }
         }
@@ -494,7 +495,7 @@ const simpleDirectives = {};
                 this.base = this.base.substring(1);
             }
             this.args = rawParts.map(rawPart => SimpleReference.getReference(this, rawPart));
-            const scope = (function () {
+            const scope = (() => {
                 const bubbler = SimpleReference.bubbleUp(parent);
                 if (bubbler instanceof SimpleAction) {
                     return bubbler.listener.directive.element.scope;
@@ -544,7 +545,7 @@ const simpleDirectives = {};
             if (typeof value === "function") {
                 value = value.apply(scope, this.args.map(arg => arg.get(additionalScope)));
             }
-            return this.bang ? value : !value;
+            return this.bang ? !value : value;
         }
         scope() {
             const parent = SimpleReference.bubbleUp(this.parent);
@@ -584,7 +585,7 @@ const simpleDirectives = {};
             else {
                 if (hasBrackets) {
                     while (/\[[^\[\]]*\]/.test(base)) {
-                        base = base.replace(/\[([^\[\]]*)\]/g, function (_, capture) {
+                        base = base.replace(/\[([^\[\]]*)\]/g, (_, capture) => {
                             const cr = this.maybeGetObjAndKey(capture, scope);
                             return "." + cr.obj[cr.key];
                         });
@@ -596,7 +597,7 @@ const simpleDirectives = {};
                 if (hasDots) {
                     const parts = base.split(".");
                     let key;
-                    parts.some(function (part, index) {
+                    parts.some((part, index) => {
                         if (index === parts.length - 1) {
                             key = part;
                         }
