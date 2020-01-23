@@ -3,7 +3,7 @@ const simpleDirectives: any = {};
     // SECTIONS:
     // > Main Classes
     // > Data Binds
-    // > Event Listening & Handling
+    // > Event Listening
     // > References
 
     function is(target: any) {
@@ -314,7 +314,7 @@ const simpleDirectives: any = {};
         }
     }
 
-    // EVENT LISTENING & HANDLING
+    // EVENT LISTENING
     // ============================================================================
 
     class SimpleListener {
