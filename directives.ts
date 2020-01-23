@@ -93,15 +93,8 @@ let SimpleDirectives;
                 });
             }
             this.instance.references = this.instance.references.map((reference: SimpleReference) => {
-                let parent: SimpleExpression | SimpleReference | SimpleAction = reference;
-                while (parent instanceof SimpleReference) {
-                    parent = parent.parent;
-                }
-                if (parent instanceof SimpleExpression && this.raw.contains(parent.directive.element.raw)) {
-                    return null;
-                } else {
-                    return reference;
-                }
+                const parent: SimpleExpression | SimpleAction = SimpleReference.bubbleUp(reference);
+                return (parent instanceof SimpleExpression && this.raw.contains(parent.directive.element.raw)) ? null : reference;
             });
             removeNulls(this.instance.references);
             return null;
@@ -279,6 +272,8 @@ let SimpleDirectives;
         }
     }
     
+    // SIMPLE ACTIONS
+    
     class SimpleAction {
         listener: SimpleListener;
         raw?: string;
@@ -295,7 +290,7 @@ let SimpleDirectives;
         constructor(listener: SimpleListener, raw: string) {
             // RAW: reference[:arg:arg:..]
             super(listener, raw);
-            this.callee = SimpleReference.getReference(this ,raw);
+            this.callee = SimpleReference.getReference(this, raw);
         }
         run() {
             // TODO
@@ -317,7 +312,7 @@ let SimpleDirectives;
         }
     }
     
-    // UPDATER CLASSES
+    // UPDATERS
 
     class SimpleUpdater extends SimpleAction {
         updatee: SimpleReference;
@@ -360,16 +355,32 @@ let SimpleDirectives;
         }
         get() { /* leave me be */ }
         run() { /* leave me be */ }
+        static bubbleUp(reference: SimpleExpression | SimpleReference | SimpleAction): SimpleExpression | SimpleAction {
+            let parent: SimpleExpression | SimpleReference | SimpleAction = reference;
+            while (parent instanceof SimpleReference) {
+                parent = parent.parent;
+            }
+            return parent;
+        }
         static getReference(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
             let reference: SimpleReference;
-            // TODO: add to conditions - assign one of:
-            // SimpleComparison (SimpleReference)
-            // ScopePointer (SimplePointer (SimpleReference))
-            // RootPointer (SimplePointer (SimpleReference))
             if (/[=<!>]/.test(raw.substring(1))) {
                 reference = new SimpleComparison(parent, raw);
             } else {
-                reference = new SimplePointer(parent, raw);
+                const scope: object = function() {
+                    const bubbler: any = SimpleReference.bubbleUp(parent);
+                    if (bubbler instanceof SimpleAction) {
+                        return bubbler.listener.directive.element.scope;
+                    } else {
+                        return bubbler.directive.element.scope;
+                    }
+                }();
+                // TODO: START HERE
+                if (/* reference exists within element scope */) {
+                    reference = new ScopePointer(parent, raw, obj, key);
+                } else {
+                    reference = new RootPointer(parent, raw, obj, key);
+                }
             }
             return reference;
         }
@@ -394,41 +405,44 @@ let SimpleDirectives;
     }
     
     class SimplePointer extends SimpleReference {
-        base: string;
-        bang: boolean;
         args: SimpleReference[];
-        obj: object;
+        bang: boolean;
+        base: string;
         key: string;
-        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
+        obj: object;
+        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string, obj: object, key: string) {
             // RAW: reference[:arg:arg:..]
             const rawParts = raw.split(":");
             super(parent, raw);
             this.base = rawParts.shift();
+            this.key = key;
+            this.obj = obj;
             if (this.base.startsWith("!")) {
-                this.base = this.base.substring(1);
                 this.bang = true;
+                this.base = this.base.substring(1);
             }
             this.args = rawParts.map(rawPart => SimpleReference.getReference(this, rawPart));
-            // TODO: set this.obj and this.key
         }
         get() {
             let value: any = this.obj[this.key];
             if (typeof value === "function") {
-                value = value.apply("TODO: SCOPE", this.args.map(arg => arg.get()));
+                value = value.apply(this.scope(), this.args.map(arg => arg.get()));
             }
             return this.bang ? value : !value;
+        }
+        scope() {
+            const parent: SimpleExpression | SimpleAction = SimpleReference.bubbleUp(this.parent);
+            return parent instanceof SimpleAction ? parent.listener.directive.element.scope : parent.directive.element.scope;
         }
     }
     
     class ScopePointer extends SimplePointer {
-        // TODO
         run() {
             // TODO
         }
     }
     
     class RootPointer extends SimplePointer {
-        // TODO
         run() {
             // TODO
         }
