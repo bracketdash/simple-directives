@@ -84,7 +84,9 @@ Reference Scope:
 -   `element`
 -   `itemName`
 
-The reference should evaluate to an array of objects.
+The reference should evaluate to an array of objects free of circular references.
+
+Elements with the `sd-for` directive should only have one direct child element.
 
 ### `html` Bind Contents
 
