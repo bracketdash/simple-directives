@@ -363,24 +363,12 @@ const simpleDirectives: any = {};
             return parent;
         }
         static getReference(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
+            // RAW: reference[:arg:arg:..]
             let reference: SimpleReference;
             if (/[=<!>]/.test(raw.substring(1))) {
                 reference = new SimpleComparison(parent, raw);
             } else {
-                const scope: object = function() {
-                    const bubbler: any = SimpleReference.bubbleUp(parent);
-                    if (bubbler instanceof SimpleAction) {
-                        return bubbler.listener.directive.element.scope;
-                    } else {
-                        return bubbler.directive.element.scope;
-                    }
-                }();
-                // TODO: START HERE
-                if (/* reference exists within element scope */) {
-                    reference = new ScopePointer(parent, raw, obj, key);
-                } else {
-                    reference = new RootPointer(parent, raw, obj, key);
-                }
+                reference = new SimplePointer(parent, raw);
             }
             return reference;
         }
@@ -410,18 +398,115 @@ const simpleDirectives: any = {};
         base: string;
         key: string;
         obj: object;
-        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string, obj: object, key: string) {
+        constructor(parent: SimpleExpression | SimpleReference | SimpleAction, raw: string) {
             // RAW: reference[:arg:arg:..]
             const rawParts = raw.split(":");
             super(parent, raw);
             this.base = rawParts.shift();
-            this.key = key;
-            this.obj = obj;
+            this.obj = { value: raw };
+            this.key = "value";
             if (this.base.startsWith("!")) {
                 this.bang = true;
                 this.base = this.base.substring(1);
             }
             this.args = rawParts.map(rawPart => SimpleReference.getReference(this, rawPart));
+            const scope: object = function() {
+                const bubbler: any = SimpleReference.bubbleUp(parent);
+                if (bubbler instanceof SimpleAction) {
+                    return bubbler.listener.directive.element.scope;
+                } else {
+                    return bubbler.directive.element.scope;
+                }
+            }();
+            
+            // TODO: START HERE
+            
+            // try to assign parent in the scope first - if it works, reassign obj and key, then: reference = new ScopePointer(parent, raw, obj, key)
+            let objAndKey = SimpleReference.maybeGetObjAndKey(scope, base);
+            // if we can't, try on the root - if it works, reassign obj and key, then: reference = new RootPointer(parent, raw, obj, key)
+            if (!objAndKey) {
+                objAndKey = SimpleReference.maybeGetObjAndKey(scope, base);
+            }
+            if (objAndKey) {
+                //
+            }
+            /*
+            const hasBrackets = reference.indexOf("[") !== -1;
+            let args = reference.split(":");
+            let bang = false;
+            let hasDots: boolean;
+            let parent: object = window.simpleDirectives.root;
+            let target: string;
+            reference = args.shift();
+            hasDots = reference.indexOf(".") !== -1;
+            if (/[=<!>]/.test(reference)) {
+                if (reference.indexOf("!") === 0 && !/[=<!>]/.test(reference.substring(1))) {
+                    reference = reference.substring(1);
+                    bang = true;
+                } else {
+                    const comparator = reference.match(/([=<!>]{1,3})/)[0];
+                    if (is(comparator).oneOf(["==", "===", "!=", "!==", "<", ">", "<=", ">="])) {
+                        return getComparisonReference(comparator, reference, scope);
+                    } else {
+                        return fallback;
+                    }
+                }
+            }
+            if (/[^a-z0-9.[\]$_]/i.test(reference)) {
+                return fallback;
+            }
+            if (!hasBrackets && !hasDots) {
+                if (parent.hasOwnProperty(reference)) {
+                    target = reference;
+                } else if (scope.hasOwnProperty(reference)) {
+                    parent = scope;
+                    target = reference;
+                } else {
+                    return fallback;
+                }
+            } else {
+                if (hasBrackets) {
+                    while (/\[[^\[\]]*\]/.test(reference)) {
+                        reference = reference.replace(/\[([^\[\]]*)\]/g, function(_, capture) {
+                            const cr = getSimpleReference(capture, scope);
+                            return "." + cr.parent[cr.target];
+                        });
+                    }
+                    if (!hasDots) {
+                        hasDots = true;
+                    }
+                }
+                if (hasDots) {
+                    const parts = reference.split(".");
+                    parts.some(function(part, index) {
+                        if (index === parts.length - 1) {
+                            target = part;
+                        } else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
+                            parent = parent[part];
+                        } else {
+                            parent = { value: reference };
+                            target = "value";
+                            return true;
+                        }
+                    });
+                    if (parent[target] === reference) {
+                        // wasn't found in the base data; let's try with scope
+                        parent = scope;
+                        parts.some(function(part, index) {
+                            if (index === parts.length - 1) {
+                                target = part;
+                            } else if (typeof parent === "object" && parent.hasOwnProperty(part)) {
+                                parent = parent[part];
+                            } else {
+                                parent = { value: reference };
+                                target = "value";
+                                return true;
+                            }
+                        });
+                    }
+                }
+            }
+            */
         }
         get() {
             let value: any = this.obj[this.key];
@@ -434,16 +519,7 @@ const simpleDirectives: any = {};
             const parent: SimpleExpression | SimpleAction = SimpleReference.bubbleUp(this.parent);
             return parent instanceof SimpleAction ? parent.listener.directive.element.scope : parent.directive.element.scope;
         }
-    }
-    
-    class ScopePointer extends SimplePointer {
-        run() {
-            // TODO
-        }
-    }
-    
-    class RootPointer extends SimplePointer {
-        run() {
+        static maybeGetObjAndKey(scope: object, raw: string): object | boolean {
             // TODO
         }
     }
