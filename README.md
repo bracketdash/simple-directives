@@ -29,7 +29,6 @@ Notes on vocabulary:
 -   "Expression" refers to a custom syntax.
 -   "Reference" is a dot and bracket reference.
     -   Don't add parentheses to function references.
-    -   Optionally re-assign `simpleDirectives.root` to any object.
     -   References inside brackets should evaluate to a string or number.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
