@@ -233,60 +233,58 @@ const simpleDirectives: any = {};
 
     class SdFor extends SimpleExpression {
         alias: string;
+        originalHTML: string;
         constructor(directive: SimpleDirective, raw: string) {
             // RAW: alias:reference[:arg:arg:..]
             const rawParts = raw.split(":");
             super(directive, raw, true);
             this.alias = rawParts.shift();
+            this.originalHTML = this.directive.element.raw.innerHTML;
             this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
-            // TODO
-            // create the scope object and provide it to the register function
-            /*
+            const $collection = value;
+            const simpleElement = this.directive.element;
+            const element = simpleElement.raw;
             const currChildren = element.children.length;
             const difference = $collection.length - currChildren;
-            const goalHTML = directive.originalHTML.repeat($collection.length);
             if (currChildren) {
-                Array.from(element.children).forEach(function(child: HTMLElement) {
-                    unregister(child);
-                });
+                Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
             }
-            element.style.width = getComputedStyle(element).width;
-            element.style.height = getComputedStyle(element).height;
-            element.style.overflow = "hidden";
             if (difference < 0) {
                 let countdown = Math.abs(difference);
                 while (countdown > 0) {
+                    // Note: This is the only reason we require a single child element
+                    // If we figure out a cpu-cheap way to support arbitrary children, we can update the docs
+                    // Consider: Vue repeats the element the `for` is on instead of the contents
                     element.removeChild(element.lastChild);
                     countdown -= 1;
                 }
             } else if (difference > 0) {
-                element.innerHTML += directive.originalHTML.repeat(difference);
-            } else if (element.innerHTML === goalHTML) {
-                element.innerHTML = goalHTML;
+                element.innerHTML += this.originalHTML.repeat(difference);
             }
-            element.style.width = null;
-            element.style.height = null;
-            element.style.overflow = null;
             Array.from(element.children).some(function(child: HTMLElement, $index: number) {
                 const scope = {};
-                scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
-                register(child, true, scope);
+                scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
+                // TODO: make sure this gets the scope of any parent sd-fors too! Not sure that's happening right now..
+                simpleElement.instance.register(child, scope);
             });
+            // if this is a select, re-run the attr in case the selected option wasn't in the dom until just now
             if (element.tagName === "SELECT") {
-                const elementDirectiveData = getElementDirectiveData(element);
-                if (elementDirectiveData.watchers) {
-                    elementDirectiveData.watchers.some(function(simpleAction: SimpleAction) {
-                        if (simpleAction.directive.type === "attr" && is("value").oneOf(simpleAction.directive.preReferences)) {
-                            setTimeout(function() {
-                                simpleAction.action(simpleAction.lastValue);
-                            });
-                        }
-                    });
-                }
+                simpleElement.directives.some(directive => {
+                    if (directive.type === "attr") {
+                        directive.expressions.some((sdAttr: SdAttr) => {
+                            if (sdAttr.attribute === "value") {
+                                setTimeout(function() {
+                                    sdAttr.run(sdAttr.reference.get());
+                                });
+                                return true;
+                            }
+                        });
+                        return true;
+                    }
+                });
             }
-            */
         }
     }
 
@@ -385,7 +383,7 @@ const simpleDirectives: any = {};
         constructor(listener: SimpleListener, raw: string) {
             // RAW: reference[:arg:arg:..]
             super(listener, raw);
-            this.callee = (SimpleReference.getReference(this, raw) as SimplePointer);
+            this.callee = SimpleReference.getReference(this, raw) as SimplePointer;
         }
         run(event: Event) {
             this.callee.get({ event });
@@ -399,7 +397,7 @@ const simpleDirectives: any = {};
             // RAW: reference=reference[:arg:arg:..]
             const rawParts = raw.split("=");
             super(listener, raw);
-            this.left = (SimpleReference.getReference(this, rawParts.shift()) as SimplePointer);
+            this.left = SimpleReference.getReference(this, rawParts.shift()) as SimplePointer;
             this.right = SimpleReference.getReference(this, rawParts[0]);
         }
         run() {
@@ -599,7 +597,10 @@ const simpleDirectives: any = {};
                 Object.assign(scope, additionalScope);
             }
             if (typeof value === "function") {
-                value = value.apply(scope, this.args.map(arg => arg.get(additionalScope)));
+                value = value.apply(
+                    scope,
+                    this.args.map(arg => arg.get(additionalScope))
+                );
             }
             return this.bang ? value : !value;
         }
