@@ -20,8 +20,6 @@ const simpleDirectives: any = {};
             arr.splice(index, 1);
         }
     }
-    
-    // TODO: go through and make sure scope is correct for every reference and function call
 
     // > MAIN CLASSES
     // ============================================================================
@@ -242,7 +240,51 @@ const simpleDirectives: any = {};
             this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
-            // TODO
+            // TODO: refactor below
+            /*
+            const currChildren = element.children.length;
+            const difference = $collection.length - currChildren;
+            const goalHTML = directive.originalHTML.repeat($collection.length);
+            if (currChildren) {
+                Array.from(element.children).forEach(function(child: HTMLElement) {
+                    unregister(child);
+                });
+            }
+            element.style.width = getComputedStyle(element).width;
+            element.style.height = getComputedStyle(element).height;
+            element.style.overflow = "hidden";
+            if (difference < 0) {
+                let countdown = Math.abs(difference);
+                while (countdown > 0) {
+                    element.removeChild(element.lastChild);
+                    countdown -= 1;
+                }
+            } else if (difference > 0) {
+                element.innerHTML += directive.originalHTML.repeat(difference);
+            } else if (element.innerHTML === goalHTML) {
+                element.innerHTML = goalHTML;
+            }
+            element.style.width = null;
+            element.style.height = null;
+            element.style.overflow = null;
+            Array.from(element.children).some(function(child: HTMLElement, $index: number) {
+                const scope = {};
+                scope[directive.preReferences[0]] = Object.assign({ $collection, $index }, $collection[$index]);
+                register(child, true, scope);
+            });
+            if (element.tagName === "SELECT") {
+                const elementDirectiveData = getElementDirectiveData(element);
+                if (elementDirectiveData.watchers) {
+                    elementDirectiveData.watchers.some(function(simpleAction: SimpleAction) {
+                        if (simpleAction.directive.type === "attr" && is("value").oneOf(simpleAction.directive.preReferences)) {
+                            setTimeout(function() {
+                                simpleAction.action(simpleAction.lastValue);
+                            });
+                        }
+                    });
+                }
+            }
+            */
         }
     }
 
@@ -417,7 +459,7 @@ const simpleDirectives: any = {};
             this.parent = parent;
             this.raw = raw;
         }
-        get() {
+        get(additionalScope?: object) {
             // leave me be
         }
         run() {
@@ -465,9 +507,9 @@ const simpleDirectives: any = {};
                 this.run();
             }
         }
-        get() {
-            const left = this.left.get();
-            const right = this.right.get();
+        get(additionalScope?: object) {
+            const left = this.left.get(additionalScope);
+            const right = this.right.get(additionalScope);
             switch (this.comparator) {
                 case "==":
                     return left == right;
@@ -537,9 +579,12 @@ const simpleDirectives: any = {};
             let value: any = this.obj[this.key];
             if (additionalScope) {
                 Object.assign(scope, additionalScope);
+            } else {
+                additionalScope = {};
             }
+            // TODO: make sure all the right data is getting into scope according to the README
             if (typeof value === "function") {
-                value = value.apply(scope, this.args.map(arg => arg.get()));
+                value = value.apply(scope, this.args.map(arg => arg.get(additionalScope)));
             }
             return this.bang ? value : !value;
         }
