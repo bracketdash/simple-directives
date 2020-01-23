@@ -20,6 +20,8 @@ const simpleDirectives: any = {};
             arr.splice(index, 1);
         }
     }
+    
+    // TODO: go through and make sure scope is correct for every reference and function call
 
     // > MAIN CLASSES
     // ============================================================================
@@ -41,7 +43,7 @@ const simpleDirectives: any = {};
                     hasDirective = true;
                 }
             });
-            if (hasDirective) {
+            if (hasDirective && !is(target).oneOf(this.elements)) {
                 element = new SimpleElement(this, target);
                 this.elements.push(element);
             }
@@ -161,13 +163,20 @@ const simpleDirectives: any = {};
             return reference;
         }
         run(value: any) {
-            /* leave me be */
+            // leave me be
         }
     }
 
     class SdIf extends SimpleExpression {
         run(value: any) {
-            // TODO
+            const element = this.directive.element;
+            if (value) {
+                element.raw.style.display = null;
+                Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.register(child));
+            } else {
+                element.raw.style.display = "none";
+                Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.unregister(child));
+            }
         }
     }
 
@@ -181,7 +190,22 @@ const simpleDirectives: any = {};
             this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
-            // TODO
+            const element = this.directive.element.raw;
+            if (this.attribute === "value" && element.tagName === "SELECT") {
+                Array.from(element.getElementsByTagName("option")).forEach(function(optionElement: HTMLOptionElement) {
+                    if ((Array.isArray(value) && is(optionElement.value).oneOf(value)) || value == optionElement.value) {
+                        optionElement.selected = true;
+                    } else {
+                        optionElement.selected = false;
+                    }
+                });
+            } else if (typeof value === "undefined") {
+                if (element.hasAttribute(this.attribute)) {
+                    element.removeAttribute(this.attribute);
+                }
+            } else {
+                element.setAttribute(this.attribute, value);
+            }
         }
     }
 
@@ -195,7 +219,16 @@ const simpleDirectives: any = {};
             this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
-            // TODO
+            const element = this.directive.element.raw;
+            this.classes.forEach(function(className) {
+                if (!value) {
+                    if (element.classList.contains(className)) {
+                        element.classList.remove(className);
+                    }
+                } else if (!element.classList.contains(className)) {
+                    element.classList.add(className);
+                }
+            });
         }
     }
 
@@ -225,7 +258,15 @@ const simpleDirectives: any = {};
 
     class SdRdo extends SimpleExpression {
         run(value: any) {
-            // TODO
+            const groupName = this.directive.element.raw.getAttribute("name");
+            const radioInputs = Array.from(document.getElementsByName(groupName));
+            radioInputs.forEach(function(radioInput: HTMLInputElement) {
+                if (radioInput.value === value) {
+                    radioInput.checked = true;
+                } else {
+                    radioInput.checked = false;
+                }
+            });
         }
     }
 
@@ -235,29 +276,27 @@ const simpleDirectives: any = {};
     class SimpleListener {
         actions: SimpleAction[];
         directive: SimpleDirective;
-        elo: EventListenerObject;
+        elo: EventListener;
         events: string[];
         raw: string;
         constructor(directive: SimpleDirective, raw: string) {
             // RAW: event,event,..:reference[:arg:arg:..][,reference[:arg:arg:..,..]]
-            const rawParts = raw.split(":");
+            let rawParts: string[] = raw.split(":");
             this.directive = directive;
             this.events = rawParts[0].split(",");
             this.raw = raw;
-            this.actions = rawParts
-                .join(":")
-                .split(",")
-                .map(
-                    (rawAction: string): SimpleAction => {
-                        if (rawAction === "$update") {
-                            return this.getUpdater();
-                        } else if (rawAction.indexOf("=") !== -1) {
-                            return new SimpleAssigner(this, rawAction);
-                        } else {
-                            return new SimpleCaller(this, rawAction);
-                        }
-                    }
-                );
+            rawParts = rawParts.join(":").split(",");
+            this.actions = rawParts.map((rawAction: string) => {
+                if (rawAction === "$update") {
+                    return this.getUpdater();
+                } else if (rawAction.indexOf("=") !== -1) {
+                    return new SimpleAssigner(this, rawAction);
+                } else {
+                    return new SimpleCaller(this, rawAction);
+                }
+            });
+            this.elo = event => this.actions.forEach(action => action.run(event));
+            this.events.forEach(eventName => this.directive.element.raw.addEventListener(eventName, this.elo));
         }
         destroy() {
             this.events.forEach((event: string) => {
@@ -292,62 +331,78 @@ const simpleDirectives: any = {};
                 this.raw = raw;
             }
         }
+        run(event?: Event) {
+            // leave me be
+        }
     }
 
     class SimpleCaller extends SimpleAction {
-        callee: SimpleReference;
+        callee: SimplePointer;
         constructor(listener: SimpleListener, raw: string) {
             // RAW: reference[:arg:arg:..]
             super(listener, raw);
-            this.callee = SimpleReference.getReference(this, raw);
+            this.callee = (SimpleReference.getReference(this, raw) as SimplePointer);
         }
-        run() {
-            // TODO
+        run(event: Event) {
+            this.callee.get(event);
         }
     }
 
     class SimpleAssigner extends SimpleAction {
-        left: SimpleReference;
+        left: SimplePointer;
         right: SimpleReference;
         constructor(listener: SimpleListener, raw: string) {
             // RAW: reference=reference[:arg:arg:..]
             const rawParts = raw.split("=");
             super(listener, raw);
-            this.left = SimpleReference.getReference(this, rawParts.shift());
+            this.left = (SimpleReference.getReference(this, rawParts.shift()) as SimplePointer);
             this.right = SimpleReference.getReference(this, rawParts[0]);
         }
         run() {
-            // TODO
+            const right = this.right.get();
+            this.left.obj[this.left.key] = right;
         }
     }
 
     // UPDATERS
 
     class SimpleUpdater extends SimpleAction {
-        updatee: SimpleReference;
+        updatee: SimplePointer;
     }
 
     class ValueUpdater extends SimpleUpdater {
         run() {
-            // TODO
+            const element = this.listener.directive.element.raw as HTMLInputElement;
+            this.updatee.obj[this.updatee.key] = element.value;
         }
     }
 
     class CheckedUpdater extends SimpleUpdater {
         run() {
-            // TODO
+            const element = this.listener.directive.element.raw as HTMLInputElement;
+            this.updatee.obj[this.updatee.key] = element.checked;
         }
     }
 
     class ContentEditableUpdater extends SimpleUpdater {
         run() {
-            // TODO
+            const element = this.listener.directive.element.raw as HTMLInputElement;
+            this.updatee.obj[this.updatee.key] = element.innerHTML;
         }
     }
 
     class RadioUpdater extends SimpleUpdater {
         run() {
-            // TODO
+            const groupName = (this.listener.directive.element.raw as HTMLInputElement).getAttribute("name");
+            const radioInputs = Array.from(document.getElementsByName(groupName));
+            let value: any;
+            radioInputs.some(function(radioInput: HTMLInputElement) {
+                if (radioInput.checked) {
+                    value = radioInput.value;
+                    return true;
+                }
+            });
+            this.updatee.obj[this.updatee.key] = value;
         }
     }
 
@@ -363,7 +418,7 @@ const simpleDirectives: any = {};
             this.raw = raw;
         }
         get() {
-            /* leave me be */
+            // leave me be
         }
         run() {
             let currentValue: any = this.get();
@@ -477,13 +532,14 @@ const simpleDirectives: any = {};
                 this.run();
             }
         }
-        get() {
+        get(additionalScope?: object) {
+            let scope: object = this.scope();
             let value: any = this.obj[this.key];
+            if (additionalScope) {
+                Object.assign(scope, additionalScope);
+            }
             if (typeof value === "function") {
-                value = value.apply(
-                    this.scope(),
-                    this.args.map(arg => arg.get())
-                );
+                value = value.apply(scope, this.args.map(arg => arg.get()));
             }
             return this.bang ? value : !value;
         }
