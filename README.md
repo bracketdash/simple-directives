@@ -131,7 +131,7 @@ All events will be assigned all references in each expression.
 
 #### Two-Way Binding Shortcut
 
-`sd-on:event:$update`
+`sd-on="event:$update"`
 
 ```html
 <!-- examples -->
