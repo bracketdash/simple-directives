@@ -30,7 +30,7 @@ Notes on vocabulary:
     -   Don't add parentheses to function references.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
-    -   If the reference is a function, the function will have the reference scope available on `this`.
+    -   If the reference calls a function, that function will also have the scope available on `this`.
 
 ## Data Bindings
 
