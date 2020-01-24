@@ -1,27 +1,30 @@
 # A Simple Directives Library
 
 ```html
-<script src="directives.min.js"></script>
-```
-
-```javascript
-simpleDirectives.register(element, root);
-```
-
-Both `element` and `root` are optional and will default to `document.body` and `window`.
-
-All children of `element` will also be registered.
-
-An instance of `SimpleDirectivesRegistrar` will be returned.
-
-```html
 <element directive="expression" />
-```
 
-Multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on`:
-
-```html
+<!-- multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on` -->
 <element directive="expression;expression;..." />
+
+<script src="directives.min.js"></script>
+<script>
+    // place where you want, but after the DOM has finished loading
+    var app;
+    if (document.readyState != "loading") {
+        // all that's needed is this one line if you know the DOM has loaded already
+        app = simpleDirectives.register();
+    } else {
+        document.addEventListener("DOMContentLoaded", function() {
+            app = simpleDirectives.register();
+            // example with arguments:
+            //  simpleDirective.register(element, root);
+            //  both `element` and `root` are optional and will default to `document.body` and `window`
+        });
+    }
+
+    // later, if you want to inspect an element how Simple Directives sees it..
+    var simpleElement = app.getSimpleElement(element);
+</script>
 ```
 
 Notes on vocabulary:
