@@ -10,7 +10,7 @@ const simpleDirectives: any = {};
         return {
             oneOf(arr: any[]): boolean {
                 let isOneOf = false;
-                arr.some((item) => {
+                arr.some(item => {
                     if (item === target) {
                         isOneOf = true;
                         return true;
@@ -53,7 +53,11 @@ const simpleDirectives: any = {};
                     return true;
                 }
             });
-            if (hasDirective && !is(target).oneOf(this.elements.map(se => se.raw))) {
+            if (
+                hasDirective &&
+                !is(target).oneOf(this.elements.map(se => se.raw)) &&
+                (!target.hasAttribute("sd-rdo") || SdRdo.isFirstRdoOfGroup(this, target as HTMLInputElement))
+            ) {
                 element = new SimpleElement(this, target, scope);
                 this.elements.push(element);
             }
@@ -203,7 +207,9 @@ const simpleDirectives: any = {};
             const element = this.directive.element;
             if (value) {
                 element.raw.style.display = null;
-                Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.register(child, this.directive.element.scope));
+                Array.from(element.raw.children).forEach((child: HTMLElement) =>
+                    element.instance.register(child, this.directive.element.scope)
+                );
             } else {
                 element.raw.style.display = "none";
                 Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.unregister(child));
@@ -321,7 +327,9 @@ const simpleDirectives: any = {};
             const element = this.directive.element;
             Array.from(element.raw.children).forEach((child: HTMLElement) => instance.unregister(child));
             element.raw.innerHTML = value;
-            Array.from(element.raw.children).forEach((child: HTMLElement) => instance.register(child, this.directive.element.scope));
+            Array.from(element.raw.children).forEach((child: HTMLElement) =>
+                instance.register(child, this.directive.element.scope)
+            );
         }
     }
 
@@ -336,6 +344,19 @@ const simpleDirectives: any = {};
                     radioInput.checked = false;
                 }
             });
+        }
+        static isFirstRdoOfGroup(instance: SimpleDirectivesRegistrar, target: HTMLInputElement) {
+            let isFirst = true;
+            instance.elements.some(({ raw }) => {
+                if (
+                    raw.tagName === "INPUT" &&
+                    raw.getAttribute("type") === "radio" &&
+                    raw.getAttribute("name") === target.getAttribute("name")
+                ) {
+                    isFirst = false;
+                }
+            });
+            return isFirst;
         }
     }
 
@@ -440,6 +461,18 @@ const simpleDirectives: any = {};
     }
 
     class ValueUpdater extends SimpleUpdater {
+        constructor(listener: SimpleListener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "attr") {
+                    directive.expressions.some((expression: SdAttr) => {
+                        if (expression.attribute === "value" && expression.reference instanceof SimplePointer) {
+                            this.updatee = expression.reference;
+                        }
+                    });
+                }
+            });
+        }
         run() {
             const element = this.listener.directive.element.raw as HTMLInputElement;
             this.updatee.obj[this.updatee.key] = element.value;
@@ -447,6 +480,18 @@ const simpleDirectives: any = {};
     }
 
     class CheckedUpdater extends SimpleUpdater {
+        constructor(listener: SimpleListener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "attr") {
+                    directive.expressions.some((expression: SdAttr) => {
+                        if (expression.attribute === "checked" && expression.reference instanceof SimplePointer) {
+                            this.updatee = expression.reference;
+                        }
+                    });
+                }
+            });
+        }
         run() {
             const element = this.listener.directive.element.raw as HTMLInputElement;
             this.updatee.obj[this.updatee.key] = element.checked;
@@ -454,6 +499,16 @@ const simpleDirectives: any = {};
     }
 
     class ContentEditableUpdater extends SimpleUpdater {
+        constructor(listener: SimpleListener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "html") {
+                    if (directive.expressions[0].reference instanceof SimplePointer) {
+                        this.updatee = directive.expressions[0].reference;
+                    }
+                }
+            });
+        }
         run() {
             const element = this.listener.directive.element.raw as HTMLInputElement;
             this.updatee.obj[this.updatee.key] = element.innerHTML;
@@ -461,6 +516,16 @@ const simpleDirectives: any = {};
     }
 
     class RadioUpdater extends SimpleUpdater {
+        constructor(listener: SimpleListener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "rdo") {
+                    if (directive.expressions[0].reference instanceof SimplePointer) {
+                        this.updatee = directive.expressions[0].reference;
+                    }
+                }
+            });
+        }
         run() {
             const groupName = (this.listener.directive.element.raw as HTMLInputElement).getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));

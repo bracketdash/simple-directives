@@ -48,7 +48,11 @@ const simpleDirectives = {};
                     return true;
                 }
             });
-            if (hasDirective && !is(target).oneOf(this.elements.map(se => se.raw))) {
+            if (
+                hasDirective &&
+                !is(target).oneOf(this.elements.map(se => se.raw)) &&
+                (!target.hasAttribute("sd-rdo") || SdRdo.isFirstRdoOfGroup(this, target))
+            ) {
                 element = new SimpleElement(this, target, scope);
                 this.elements.push(element);
             }
@@ -309,6 +313,19 @@ const simpleDirectives = {};
                 }
             });
         }
+        static isFirstRdoOfGroup(instance, target) {
+            let isFirst = true;
+            instance.elements.some(({ raw }) => {
+                if (
+                    raw.tagName === "INPUT" &&
+                    raw.getAttribute("type") === "radio" &&
+                    raw.getAttribute("name") === target.getAttribute("name")
+                ) {
+                    isFirst = false;
+                }
+            });
+            return isFirst;
+        }
     }
     // EVENT LISTENING
     // ============================================================================
@@ -391,24 +408,68 @@ const simpleDirectives = {};
     // UPDATERS
     class SimpleUpdater extends SimpleAction {}
     class ValueUpdater extends SimpleUpdater {
+        constructor(listener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "attr") {
+                    directive.expressions.some(expression => {
+                        if (expression.attribute === "value" && expression.reference instanceof SimplePointer) {
+                            this.updatee = expression.reference;
+                        }
+                    });
+                }
+            });
+        }
         run() {
             const element = this.listener.directive.element.raw;
             this.updatee.obj[this.updatee.key] = element.value;
         }
     }
     class CheckedUpdater extends SimpleUpdater {
+        constructor(listener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "attr") {
+                    directive.expressions.some(expression => {
+                        if (expression.attribute === "checked" && expression.reference instanceof SimplePointer) {
+                            this.updatee = expression.reference;
+                        }
+                    });
+                }
+            });
+        }
         run() {
             const element = this.listener.directive.element.raw;
             this.updatee.obj[this.updatee.key] = element.checked;
         }
     }
     class ContentEditableUpdater extends SimpleUpdater {
+        constructor(listener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "html") {
+                    if (directive.expressions[0].reference instanceof SimplePointer) {
+                        this.updatee = directive.expressions[0].reference;
+                    }
+                }
+            });
+        }
         run() {
             const element = this.listener.directive.element.raw;
             this.updatee.obj[this.updatee.key] = element.innerHTML;
         }
     }
     class RadioUpdater extends SimpleUpdater {
+        constructor(listener) {
+            super(listener);
+            this.listener.directive.element.directives.some(directive => {
+                if (directive.type === "rdo") {
+                    if (directive.expressions[0].reference instanceof SimplePointer) {
+                        this.updatee = directive.expressions[0].reference;
+                    }
+                }
+            });
+        }
         run() {
             const groupName = this.listener.directive.element.raw.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
