@@ -421,8 +421,12 @@ const simpleDirectives = {};
             });
         }
         run() {
-            const element = this.listener.directive.element.raw;
-            this.updatee.obj[this.updatee.key] = element.value;
+            const value = this.listener.directive.element.raw.value;
+            if (typeof this.updatee.obj[this.updatee.key] === "number" && !isNaN(Number(value))) {
+                this.updatee.obj[this.updatee.key] = Number(value);
+            } else {
+                this.updatee.obj[this.updatee.key] = value;
+            }
         }
     }
     class CheckedUpdater extends SimpleUpdater {

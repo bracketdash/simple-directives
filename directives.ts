@@ -474,8 +474,12 @@ const simpleDirectives: any = {};
             });
         }
         run() {
-            const element = this.listener.directive.element.raw as HTMLInputElement;
-            this.updatee.obj[this.updatee.key] = element.value;
+            const value = (this.listener.directive.element.raw as HTMLInputElement).value;
+            if (typeof this.updatee.obj[this.updatee.key] === "number" && !isNaN(Number(value))) {
+                this.updatee.obj[this.updatee.key] = Number(value);
+            } else {
+                this.updatee.obj[this.updatee.key] = value;
+            }
         }
     }
 
