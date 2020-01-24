@@ -21,7 +21,6 @@ Directives on `element` and all children will be registered and start working.
 
 `element` and `root` are optional and default to `document.body` and `window`.
 
-
 Notes on vocabulary:
 
 -   "Expression" refers to a custom syntax.
