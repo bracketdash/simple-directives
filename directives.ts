@@ -284,26 +284,31 @@ const simpleDirectives: any = {};
             const $collection = value;
             const simpleElement = this.directive.element;
             const element = simpleElement.raw;
-            const currChildren = element.children.length;
-            const difference = $collection.length - currChildren;
             Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
-            if (difference < 0) {
-                let countdown = Math.abs(difference);
-                while (countdown > 0) {
-                    // Note: This is the only reason we require a single direct child element
-                    // If we figure out a cpu-cheap way to support arbitrary children, we can update the docs
-                    // Consider: Vue repeats the element the `for` is on instead of the contents
-                    element.removeChild(element.lastChild);
-                    countdown -= 1;
-                }
-            } else if (difference > 0) {
-                element.innerHTML += this.originalHTML.repeat(difference);
+            const orphan = document.createElement("div");
+            orphan.innerHTML = this.originalHTML.repeat($collection.length);
+            if (orphan.children.length > element.children.length) {
+                Array.from(orphan.children).forEach((child, index) => {
+                    if (index >= element.children.length) {
+                        element.appendChild(child);
+                    }
+                });
+            } else if (orphan.children.length < element.children.length) {
+                Array.from(element.children).forEach((_, index) => {
+                    if (index >= orphan.children.length) {
+                        element.removeChild(element.lastChild);
+                    }
+                });
             }
+            
+            // TODO: the below is not working as expected
+            // it needs to iterate over the repeated markup regardless if there are multiple direct children that go with one loop
             Array.from(element.children).some((child: HTMLElement, $index: number) => {
                 const scope = Object.assign({}, this.directive.element.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
                 simpleElement.instance.register(child, scope);
             });
+            
             // if this is a select, re-run the attr in case the selected option wasn't in the dom until just now
             if (element.tagName === "SELECT") {
                 simpleElement.directives.some(directive => {
