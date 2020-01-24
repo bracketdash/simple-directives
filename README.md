@@ -23,7 +23,7 @@ Directives on `element` and all children will be registered and start working.
 
 Notes on vocabulary:
 
--   "Expression" refers to a custom syntax.
+-   "Expression" refers to a custom syntax that's slightly different from JavaScript expressions.
 -   "Reference" refers to a JavaScript variable, function, comparison, or assignment.
     -   In most cases, references should evaluate to a primitive type.
     -   Don't add parentheses to function references.
@@ -47,9 +47,7 @@ The reference should evaluate to plain text or a valid HTML fragment.
 
 `sd-class="class:reference"`
 
-Multiple semicolon-separated expressions are allowed.
-
-Multiple comma-separated classes are allowed.
+`sd-class="class,class,..:reference;class:reference;.."`
 
 Reference Scope:
 
@@ -64,7 +62,7 @@ Truthy: The element will have the given class(es).
 
 `sd-attr="attribute:reference"`
 
-Multiple semicolon-separated expressions are allowed.
+`sd-attr="attribute:reference;attribute:reference;.."`
 
 Reference Scope:
 
@@ -85,7 +83,7 @@ Reference Scope:
 
 The reference should evaluate to a string or number.
 
-Only add one `sd-rdo` per radio group.
+Only the first `sd-rdo` of each radio group will be registered.
 
 ## Looping Templates
 
@@ -107,7 +105,7 @@ Reference Scope:
 
 The reference should evaluate to an array of objects free of circular references.
 
-Elements with the `sd-for` directive should only have one direct child element.
+Elements with the `sd-for` directive should only have one direct child element, but can have multiple grandchildren.
 
 ## Conditionals
 
@@ -129,11 +127,7 @@ Falsy: The element will be hidden; bindings within paused.
 
 `sd-on="event:reference"`
 
-Multiple semicolon-separated expressions are allowed.
-
-Multiple comma-separated events are allowed.
-
-Multiple comma-separated references are allowed.
+`sd-on="event,event,..:reference,reference,..;event:reference;.."`
 
 Reference Scope:
 
@@ -175,8 +169,8 @@ Examples:
 
 Each argument can be treated as a reference except that functions will be passed as-is.
 
-If the argument is not a valid reference, it will be passed as a string.
+If an argument is not a valid reference, it will be passed as a string.
 
-If you intend to pass a string as the argument, don't place quotes around it.
+If you intend to pass a string as an argument, don't place quotes around it.
 
 Arguments may not include the `:`, `;`, or `,` characters.
