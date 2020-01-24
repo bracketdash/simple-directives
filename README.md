@@ -1,30 +1,26 @@
 # A Simple Directives Library
 
 ```html
+<!-- basic syntax -->
 <element sd-directive="expression" />
 
-<!-- multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on` -->
-<element sd-directive="expression;expression;..." />
+<!-- multiple expressions are allowed on `sd-attr`, `sd-class`, and `sd-on` -->
+<element sd-class="class:refrerence;class:refrerence;..." />
 
 <script src="directives.min.js"></script>
 <script>
-    // place where you want, but after the DOM has finished loading
-    var app;
-    if (document.readyState != "loading") {
-        // all that's needed is this next line if you know the DOM has loaded already
-        app = simpleDirectives.register(element, root);
-        // `element` and `root` are optional and default to `document.body` and `window`
-    } else {
-        document.addEventListener("DOMContentLoaded", function() {
-            app = simpleDirectives.register(element, root);
-            // directives on `element` and all children will be registered and start working
-        });
-    }
+    // place where you want, but after the dom has finished loading
+    var app = simpleDirectives.register(element, root);
 
-    // later, if you want to inspect an element how Simple Directives sees it..
+    // if you want to inspect an element how simple-directives sees it
     var simpleElement = app.getSimpleElement(element);
 </script>
 ```
+
+Directives on `element` and all children will be registered and start working.
+
+`element` and `root` are optional and default to `document.body` and `window`.
+
 
 Notes on vocabulary:
 
@@ -36,9 +32,9 @@ Notes on vocabulary:
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference is a function, the function will have the reference scope available on `this`.
 
-## Create Data Bindings
+## Data Bindings
 
-### `html` Control Contents
+### `html` controls contents
 
 `sd-html="reference"`
 
@@ -48,7 +44,7 @@ Reference Scope:
 
 The reference should evaluate to plain text or a valid HTML fragment.
 
-### `class` Toggle Classes
+### `class` toggles classes
 
 `sd-class="class:reference"`
 
@@ -65,7 +61,7 @@ The reference can be a comparison of two references.
 
 Truthy: The element will have the given class(es).
 
-### `attr` Control Attributes
+### `attr` controls attributes
 
 `sd-attr="attribute:reference"`
 
@@ -80,7 +76,21 @@ Truthy: The given attribute's value will be that of the reference.
 
 Falsy: The given attribute will not be present on the element.
 
-### `for` Loop Contents Over Data
+### `rdo` controls radio groups
+
+`sd-rdo="reference"`
+
+Reference Scope:
+
+-   `element`
+
+The reference should evaluate to a string or number.
+
+Only add one `sd-rdo` per radio group.
+
+## Looping Templates
+
+### `for` loops contents over a collection
 
 `sd-for="item:reference"`
 
@@ -100,19 +110,9 @@ The reference should evaluate to an array of objects free of circular references
 
 Elements with the `sd-for` directive should only have one direct child element.
 
-### `rdo` Bind Radio Groups
+## Conditionals
 
-`sd-rdo="reference"`
-
-Reference Scope:
-
--   `element`
-
-The reference should evaluate to a string or number.
-
-Only add one `sd-rdo` per radio group.
-
-### `if` Conditionals
+### `if` toggles the element
 
 `sd-if="reference"`
 
@@ -126,7 +126,7 @@ Falsy: The element will be hidden; bindings within paused.
 
 ## User Interaction
 
-### `on` Set Event Listeners
+### `on` adds event listeners
 
 `sd-on="event:reference"`
 
