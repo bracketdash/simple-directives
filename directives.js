@@ -83,11 +83,11 @@ const simpleDirectives = {};
             ["if", "for", "attr", "class", "html", "rdo", "on"].forEach(type => {
                 const attributeValue = element.getAttribute(`sd-${type}`);
                 if (attributeValue) {
-                    const directive = new SimpleDirective(this, type, attributeValue.replace(/\s+/g, ""));
-                    this.directives.push(directive);
                     if (type === "for") {
                         this.on = false;
                     }
+                    const directive = new SimpleDirective(this, type, attributeValue.replace(/\s+/g, ""));
+                    this.directives.push(directive);
                 }
             });
         }
