@@ -9,7 +9,14 @@ const simpleDirectives: any = {};
     function is(target: any) {
         return {
             oneOf(arr: any[]): boolean {
-                return arr.indexOf(target) !== -1;
+                let isOneOf = false;
+                arr.some((item) => {
+                    if (item === target) {
+                        isOneOf = true;
+                        return true;
+                    }
+                });
+                return isOneOf;
             }
         };
     }
@@ -34,19 +41,23 @@ const simpleDirectives: any = {};
             this.runner();
         }
         register(target: HTMLElement, scope?: object) {
-            let hasDirective = false;
             let element: SimpleElement;
+            let hasDirective = false;
+            let skipChildren = false;
             ["attr", "class", "for", "html", "if", "on", "rdo"].some((type: string) => {
                 if (target.hasAttribute(`sd-${type}`)) {
                     hasDirective = true;
+                    if (is(type).oneOf(["if", "for"])) {
+                        skipChildren = true;
+                    }
                     return true;
                 }
             });
-            if (hasDirective && !is(target).oneOf(this.elements)) {
+            if (hasDirective && !is(target).oneOf(this.elements.map(se => se.raw))) {
                 element = new SimpleElement(this, target, scope);
                 this.elements.push(element);
             }
-            if (!element || element.on) {
+            if (!element || !skipChildren) {
                 Array.from(target.children).forEach((child: HTMLElement) => this.register(child, scope));
             }
         }
@@ -80,7 +91,6 @@ const simpleDirectives: any = {};
 
     class SimpleElement {
         directives: SimpleDirective[] = [];
-        on: boolean;
         instance: SimpleDirectivesRegistrar;
         raw: HTMLElement;
         scope: object;
@@ -88,14 +98,10 @@ const simpleDirectives: any = {};
             this.instance = instance;
             this.raw = element;
             this.scope = scope ? scope : {};
-            this.on = true;
             // IMPORTANT: `if` and `for` must be first; `on` must be last
             ["if", "for", "attr", "class", "html", "rdo", "on"].forEach((type: string) => {
                 const attributeValue = element.getAttribute(`sd-${type}`);
                 if (attributeValue) {
-                    if (type === "for") {
-                        this.on = false;
-                    }
                     const directive: SimpleDirective = new SimpleDirective(this, type, attributeValue.replace(/\s+/g, ""));
                     this.directives.push(directive);
                 }
@@ -107,6 +113,14 @@ const simpleDirectives: any = {};
                 this.directives.some((directive: SimpleDirective) => {
                     if (directive.type === "on") {
                         directive.listeners.forEach(listener => listener.destroy());
+                        return true;
+                    }
+                });
+            }
+            if (is("for").oneOf(directiveTypes)) {
+                this.directives.some((directive: SimpleDirective) => {
+                    if (directive.type === "for") {
+                        this.raw.innerHTML = (directive.expressions[0] as SdFor).originalHTML;
                         return true;
                     }
                 });
@@ -187,10 +201,9 @@ const simpleDirectives: any = {};
     class SdIf extends SimpleExpression {
         run(value: any) {
             const element = this.directive.element;
-            element.on = !!value;
             if (value) {
                 element.raw.style.display = null;
-                Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.register(child));
+                Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.register(child, this.directive.element.scope));
             } else {
                 element.raw.style.display = "none";
                 Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.unregister(child));
@@ -266,24 +279,19 @@ const simpleDirectives: any = {};
             const simpleElement = this.directive.element;
             const element = simpleElement.raw;
             const currChildren = element.children.length;
-            if (!this.directive.element.on) {
-                this.directive.element.on = true;
-                element.innerHTML = this.originalHTML.repeat($collection.length);
-            } else {
-                const difference = $collection.length - currChildren;
-                Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
-                if (difference < 0) {
-                    let countdown = Math.abs(difference);
-                    while (countdown > 0) {
-                        // Note: This is the only reason we require a single child element
-                        // If we figure out a cpu-cheap way to support arbitrary children, we can update the docs
-                        // Consider: Vue repeats the element the `for` is on instead of the contents
-                        element.removeChild(element.lastChild);
-                        countdown -= 1;
-                    }
-                } else if (difference > 0) {
-                    element.innerHTML += this.originalHTML.repeat(difference);
+            const difference = $collection.length - currChildren;
+            Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
+            if (difference < 0) {
+                let countdown = Math.abs(difference);
+                while (countdown > 0) {
+                    // Note: This is the only reason we require a single direct child element
+                    // If we figure out a cpu-cheap way to support arbitrary children, we can update the docs
+                    // Consider: Vue repeats the element the `for` is on instead of the contents
+                    element.removeChild(element.lastChild);
+                    countdown -= 1;
                 }
+            } else if (difference > 0) {
+                element.innerHTML += this.originalHTML.repeat(difference);
             }
             Array.from(element.children).some((child: HTMLElement, $index: number) => {
                 const scope = Object.assign({}, this.directive.element.scope);
@@ -313,7 +321,7 @@ const simpleDirectives: any = {};
             const element = this.directive.element;
             Array.from(element.raw.children).forEach((child: HTMLElement) => instance.unregister(child));
             element.raw.innerHTML = value;
-            Array.from(element.raw.children).forEach((child: HTMLElement) => instance.register(child));
+            Array.from(element.raw.children).forEach((child: HTMLElement) => instance.register(child, this.directive.element.scope));
         }
     }
 
