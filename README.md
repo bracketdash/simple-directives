@@ -47,14 +47,12 @@ The reference should evaluate to plain text or a valid HTML fragment.
 
 `sd-class="class:reference"`
 
-`sd-class="class,class,..:reference;class:reference;.."`
+`sd-class="class,class,..:reference;class:reference < reference;.."`
 
 Reference Scope:
 
 -   `element`
 -   `classNames`
-
-The reference can be a comparison of two references.
 
 Truthy: The element will have the given class(es).
 
@@ -113,11 +111,11 @@ Elements with the `sd-for` directive should only have one direct child element, 
 
 `sd-if="reference"`
 
+`sd-if="reference === reference"`
+
 Reference Scope:
 
 -   `element`
-
-The reference can be a comparison of two references.
 
 Falsy: The element will be hidden; bindings within paused.
 
@@ -125,19 +123,15 @@ Falsy: The element will be hidden; bindings within paused.
 
 ### `on` adds event listeners
 
-`sd-on="event:reference"`
+`sd-on="event:function;event:assignableReference = reference"`
 
-`sd-on="event,event,..:reference,reference,..;event:reference;.."`
+`sd-on="event,event,..:function,function,..;event:function;.."`
 
 Reference Scope:
 
 -   `element`
 -   `eventNames`
 -   `event` (only available when event fires)
-
-The reference should be a function or:
-
-`assignableReference = referenceOrStringWithoutQuotes`
 
 All events will be assigned all references in each expression.
 
