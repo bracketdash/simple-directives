@@ -39,13 +39,14 @@ const simpleDirectives: any = {};
             ["attr", "class", "for", "html", "if", "on", "rdo"].some((type: string) => {
                 if (target.hasAttribute(`sd-${type}`)) {
                     hasDirective = true;
+                    return true;
                 }
             });
             if (hasDirective && !is(target).oneOf(this.elements)) {
                 element = new SimpleElement(this, target, scope);
                 this.elements.push(element);
             }
-            if (!element || !element.hasFalseIf) {
+            if (!element || element.on) {
                 Array.from(target.children).forEach((child: HTMLElement) => this.register(child, scope));
             }
         }
@@ -79,7 +80,7 @@ const simpleDirectives: any = {};
 
     class SimpleElement {
         directives: SimpleDirective[] = [];
-        hasFalseIf: boolean;
+        on: boolean;
         instance: SimpleDirectivesRegistrar;
         raw: HTMLElement;
         scope: object;
@@ -87,11 +88,16 @@ const simpleDirectives: any = {};
             this.instance = instance;
             this.raw = element;
             this.scope = scope ? scope : {};
-            // IMPORTANT: `if` must be first; `for` must be second; `on` must be last
-            ["if", "for", "attr", "class", "html", "rdo", "on"].some((type: string) => {
+            this.on = true;
+            // IMPORTANT: `if` and `for` must be second; `on` must be last
+            ["if", "for", "attr", "class", "html", "rdo", "on"].forEach((type: string) => {
                 const attributeValue = element.getAttribute(`sd-${type}`);
                 if (attributeValue) {
-                    this.directives.push(new SimpleDirective(this, type, attributeValue.replace(/\s+/g, "")));
+                    const directive: SimpleDirective = new SimpleDirective(this, type, attributeValue.replace(/\s+/g, ""));
+                    this.directives.push(directive);
+                    if (type === "for") {
+                        this.on = false;
+                    }
                 }
             });
         }
@@ -182,9 +188,11 @@ const simpleDirectives: any = {};
         run(value: any) {
             const element = this.directive.element;
             if (value) {
+                element.on = true;
                 element.raw.style.display = null;
                 Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.register(child));
             } else {
+                element.on = false;
                 element.raw.style.display = "none";
                 Array.from(element.raw.children).forEach((child: HTMLElement) => element.instance.unregister(child));
             }
@@ -260,20 +268,23 @@ const simpleDirectives: any = {};
             const element = simpleElement.raw;
             const currChildren = element.children.length;
             const difference = $collection.length - currChildren;
-            if (currChildren) {
+            if (!this.directive.element.on) {
+                this.directive.element.on = true;
+                element.innerHTML = this.originalHTML.repeat($collection.length);
+            } else if (currChildren) {
                 Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
-            }
-            if (difference < 0) {
-                let countdown = Math.abs(difference);
-                while (countdown > 0) {
-                    // Note: This is the only reason we require a single child element
-                    // If we figure out a cpu-cheap way to support arbitrary children, we can update the docs
-                    // Consider: Vue repeats the element the `for` is on instead of the contents
-                    element.removeChild(element.lastChild);
-                    countdown -= 1;
+                if (difference < 0) {
+                    let countdown = Math.abs(difference);
+                    while (countdown > 0) {
+                        // Note: This is the only reason we require a single child element
+                        // If we figure out a cpu-cheap way to support arbitrary children, we can update the docs
+                        // Consider: Vue repeats the element the `for` is on instead of the contents
+                        element.removeChild(element.lastChild);
+                        countdown -= 1;
+                    }
+                } else if (difference > 0) {
+                    element.innerHTML += this.originalHTML.repeat(difference);
                 }
-            } else if (difference > 0) {
-                element.innerHTML += this.originalHTML.repeat(difference);
             }
             Array.from(element.children).some((child: HTMLElement, $index: number) => {
                 const scope = Object.assign({}, this.directive.element.scope);
