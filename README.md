@@ -1,24 +1,23 @@
 # A Simple Directives Library
 
 ```html
-<element directive="expression" />
+<element sd-directive="expression" />
 
 <!-- multiple expressions allowed on `sd-attr`, `sd-class`, and `sd-on` -->
-<element directive="expression;expression;..." />
+<element sd-directive="expression;expression;..." />
 
 <script src="directives.min.js"></script>
 <script>
     // place where you want, but after the DOM has finished loading
     var app;
     if (document.readyState != "loading") {
-        // all that's needed is this one line if you know the DOM has loaded already
-        app = simpleDirectives.register();
+        // all that's needed is this next line if you know the DOM has loaded already
+        app = simpleDirectives.register(element, root);
+        // `element` and `root` are optional and default to `document.body` and `window`
     } else {
         document.addEventListener("DOMContentLoaded", function() {
-            app = simpleDirectives.register();
-            // example with arguments:
-            //  simpleDirective.register(element, root);
-            //  both `element` and `root` are optional and will default to `document.body` and `window`
+            app = simpleDirectives.register(element, root);
+            // directives on `element` and all children will be registered and start working
         });
     }
 
