@@ -722,11 +722,19 @@ const simpleDirectives: any = {};
                 }
             } else {
                 if (hasBrackets) {
+                    let foundPath = true;
                     while (/\[[^\[\]]*\]/.test(base)) {
                         base = base.replace(/\[([^\[\]]*)\]/g, (_, capture) => {
                             const cr = this.maybeGetObjAndKey(capture, scope);
+                            if (!cr.key) {
+                                foundPath = false;
+                                return "";
+                            }
                             return "." + cr.obj[cr.key];
                         });
+                    }
+                    if (!foundPath) {
+                        return fallback;
                     }
                     if (!hasDots) {
                         hasDots = true;
