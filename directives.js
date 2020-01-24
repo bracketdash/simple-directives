@@ -79,7 +79,7 @@ const simpleDirectives = {};
             this.raw = element;
             this.scope = scope ? scope : {};
             this.on = true;
-            // IMPORTANT: `if` and `for` must be second; `on` must be last
+            // IMPORTANT: `if` and `for` must be first; `on` must be last
             ["if", "for", "attr", "class", "html", "rdo", "on"].forEach(type => {
                 const attributeValue = element.getAttribute(`sd-${type}`);
                 if (attributeValue) {
