@@ -29,28 +29,24 @@
 Notes on vocabulary:
 
 -   "Expression" refers to a custom syntax.
--   "Reference" is a dot and bracket reference.
+-   "Reference" refers to a JavaScript variable, function, comparison, or assignment.
+    -   In most cases, references should evaluate to a primitive type.
     -   Don't add parentheses to function references.
 -   "Reference scope" refers to additional data available.
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference is a function, the function will have the reference scope available on `this`.
 
-## The Directives
+## Create Data Bindings
 
-### `attr` Bind Attributes
+### `html` Control Contents
 
-`sd-attr="attribute:reference"`
-
-Multiple semicolon-separated expressions are allowed.
+`sd-html="reference"`
 
 Reference Scope:
 
 -   `element`
--   `attributeName`
 
-Truthy: The given attribute's value will be that of the reference.
-
-Falsy: The given attribute will not be present on the element.
+The reference should evaluate to plain text or a valid HTML fragment.
 
 ### `class` Toggle Classes
 
@@ -68,6 +64,21 @@ Reference Scope:
 The reference can be a comparison of two references.
 
 Truthy: The element will have the given class(es).
+
+### `attr` Control Attributes
+
+`sd-attr="attribute:reference"`
+
+Multiple semicolon-separated expressions are allowed.
+
+Reference Scope:
+
+-   `element`
+-   `attributeName`
+
+Truthy: The given attribute's value will be that of the reference.
+
+Falsy: The given attribute will not be present on the element.
 
 ### `for` Loop Contents Over Data
 
@@ -89,17 +100,19 @@ The reference should evaluate to an array of objects free of circular references
 
 Elements with the `sd-for` directive should only have one direct child element.
 
-### `html` Bind Contents
+### `rdo` Bind Radio Groups
 
-`sd-html="reference"`
+`sd-rdo="reference"`
 
 Reference Scope:
 
 -   `element`
 
-The reference should evaluate to plain text or a valid HTML fragment.
+The reference should evaluate to a string or number.
 
-### `if` Set Conditions
+Only add one `sd-rdo` per radio group.
+
+### `if` Conditionals
 
 `sd-if="reference"`
 
@@ -110,6 +123,8 @@ Reference Scope:
 The reference can be a comparison of two references.
 
 Falsy: The element will be hidden; bindings within paused.
+
+## User Interaction
 
 ### `on` Set Event Listeners
 
@@ -133,7 +148,7 @@ The reference should be a function or:
 
 All events will be assigned all references in each expression.
 
-#### Two-Way Binding Shortcut
+### Two-Way Binding Shortcut
 
 `sd-on="event:$update"`
 
@@ -150,18 +165,6 @@ All events will be assigned all references in each expression.
 <input type="text" sd-attr="value:reference" sd-on="change:$update,reference" />
 <input type="text" sd-attr="value:reference" sd-on="change:reference,$update,..." />
 ```
-
-### `rdo` Bind Radio Groups
-
-`sd-rdo="reference"`
-
-Reference Scope:
-
--   `element`
-
-The reference should evaluate to a string or number.
-
-Only add one `sd-rdo` per radio group.
 
 ## Function Arguments
 
