@@ -217,7 +217,7 @@ const simpleDirectives: any = {};
                         optionElement.selected = false;
                     }
                 });
-            } else if (typeof value === "undefined") {
+            } else if (!value) {
                 if (element.hasAttribute(this.attribute)) {
                     element.removeAttribute(this.attribute);
                 }
