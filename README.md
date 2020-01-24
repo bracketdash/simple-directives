@@ -28,7 +28,7 @@ Notes on vocabulary:
 -   "Reference" refers to a JavaScript variable, function, comparison, or assignment.
     -   In most cases, references should evaluate to a primitive type.
     -   Don't add parentheses to function references.
--   "Reference scope" refers to additional data available.
+-   "Reference scope" refers to data available in references in addition to the root.
     -   References to this data can be made as though it is at the root of the base reference.
     -   If the reference calls a function, that function will also have the scope available on `this`.
 
