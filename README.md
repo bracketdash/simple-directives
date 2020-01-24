@@ -5,7 +5,7 @@
 <element sd-directive="expression" />
 
 <!-- multiple expressions are allowed on `sd-attr`, `sd-class`, and `sd-on` -->
-<element sd-class="class:refrerence;class:refrerence;..." />
+<element sd-class="class:reference;class:reference;..." />
 
 <script src="directives.min.js"></script>
 <script>
