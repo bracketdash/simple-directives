@@ -171,7 +171,7 @@ const simpleDirectives: any = {};
             this.directive = directive;
             if (!skipRefAssignment) {
                 // RAW: reference[:arg:arg:..]
-                this.assignReference(raw);
+                this.reference = this.assignReference(raw);
             }
         }
         assignReference(raw: string): SimpleReference {
@@ -205,7 +205,7 @@ const simpleDirectives: any = {};
             const rawParts = raw.split(":");
             super(directive, raw, true);
             this.attribute = rawParts.shift();
-            this.assignReference(rawParts.join(":"));
+            this.reference = this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
             const element = this.directive.element.raw;
@@ -234,7 +234,7 @@ const simpleDirectives: any = {};
             const rawParts = raw.split(":");
             super(directive, raw, true);
             this.classes = rawParts.shift().split(",");
-            this.assignReference(rawParts.join(":"));
+            this.reference = this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
             const element = this.directive.element.raw;
@@ -259,7 +259,7 @@ const simpleDirectives: any = {};
             super(directive, raw, true);
             this.alias = rawParts.shift();
             this.originalHTML = this.directive.element.raw.innerHTML;
-            this.assignReference(rawParts.join(":"));
+            this.reference = this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
             const $collection = value;
@@ -269,7 +269,7 @@ const simpleDirectives: any = {};
             if (!this.directive.element.on) {
                 this.directive.element.on = true;
                 element.innerHTML = this.originalHTML.repeat($collection.length);
-            } else if (currChildren) {
+            } else {
                 const difference = $collection.length - currChildren;
                 Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
                 if (difference < 0) {
