@@ -165,12 +165,11 @@ const simpleDirectives = {};
     class SdIf extends SimpleExpression {
         run(value) {
             const element = this.directive.element;
+            element.on = !!value;
             if (value) {
-                element.on = true;
                 element.raw.style.display = null;
                 Array.from(element.raw.children).forEach(child => element.instance.register(child));
             } else {
-                element.on = false;
                 element.raw.style.display = "none";
                 Array.from(element.raw.children).forEach(child => element.instance.unregister(child));
             }
@@ -238,11 +237,11 @@ const simpleDirectives = {};
             const simpleElement = this.directive.element;
             const element = simpleElement.raw;
             const currChildren = element.children.length;
-            const difference = $collection.length - currChildren;
             if (!this.directive.element.on) {
                 this.directive.element.on = true;
                 element.innerHTML = this.originalHTML.repeat($collection.length);
             } else if (currChildren) {
+                const difference = $collection.length - currChildren;
                 Array.from(element.children).forEach(child => simpleElement.instance.unregister(child));
                 if (difference < 0) {
                     let countdown = Math.abs(difference);
