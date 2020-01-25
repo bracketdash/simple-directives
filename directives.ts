@@ -1,10 +1,17 @@
 const simpleDirectives: any = {};
 (function(simpleDirectives) {
     // SECTIONS:
-    // > Main Classes
-    // > Data Binds
-    // > Event Listening
+    // > Registrar
+    // > Elements
+    // > Directives
+    // > Actions
     // > References
+
+    // TODO: skip making a directive just to house multiple expressions
+    // TODO: instead, handle splitting expressons in the element class and make a new directive from each one
+    // TODO: remove the current SimpleDirective class and rename the SimpleExpression class to SimpleDirective
+    // TODO: rename SimpleListener and make it an extension of SimpleDirective
+    // TODO: (even if that means we need to make SimpleDirective really basic and have a new middle class for the other directives)
 
     function is(target: any) {
         return {
@@ -28,7 +35,7 @@ const simpleDirectives: any = {};
         }
     }
 
-    // > MAIN CLASSES
+    // > REGISTRAR
     // ============================================================================
 
     class SimpleDirectivesRegistrar {
@@ -93,6 +100,9 @@ const simpleDirectives: any = {};
         }
     }
 
+    // > ELEMENTS
+    // ============================================================================
+
     class SimpleElement {
         directives: SimpleDirective[] = [];
         instance: SimpleDirectivesRegistrar;
@@ -140,6 +150,9 @@ const simpleDirectives: any = {};
         }
     }
 
+    // > DIRECTIVES
+    // ============================================================================
+
     class SimpleDirective {
         element: SimpleElement;
         expressions?: SimpleExpression[];
@@ -176,9 +189,6 @@ const simpleDirectives: any = {};
             });
         }
     }
-
-    // > DATA BINDS
-    // ============================================================================
 
     class SimpleExpression {
         raw: string;
@@ -357,9 +367,6 @@ const simpleDirectives: any = {};
         }
     }
 
-    // EVENT LISTENING
-    // ============================================================================
-
     class SimpleListener {
         actions: SimpleAction[];
         directive: SimpleDirective;
@@ -407,7 +414,8 @@ const simpleDirectives: any = {};
         }
     }
 
-    // SIMPLE ACTIONS
+    // ACTIONS
+    // ============================================================================
 
     class SimpleAction {
         listener: SimpleListener;
@@ -450,8 +458,6 @@ const simpleDirectives: any = {};
             this.left.obj[this.left.key] = right;
         }
     }
-
-    // UPDATERS
 
     class SimpleUpdater extends SimpleAction {
         updatee: SimplePointer;
@@ -541,7 +547,7 @@ const simpleDirectives: any = {};
         }
     }
 
-    // REFERENCE CLASSES
+    // REFERENCES
     // ============================================================================
 
     class SimpleReference {
@@ -575,7 +581,7 @@ const simpleDirectives: any = {};
             if (Array.isArray(currentValue)) {
                 currentValue = currentValue.slice(0);
             }
-            // TODO: test swapping objects in teh array of an sd-for
+            // TODO: test swapping objects in the array of an sd-for
             if (valueChanged) {
                 // || skipDiffCheck -- TODO: add back once done debugging
                 if (typeof currentValue === "object") {
@@ -648,11 +654,6 @@ const simpleDirectives: any = {};
         }
     }
 
-    interface ObjAndKey {
-        key?: string;
-        nah?: boolean;
-        obj?: object;
-    }
     class SimplePointer extends SimpleReference {
         args: SimpleReference[];
         bang: boolean;
@@ -689,7 +690,7 @@ const simpleDirectives: any = {};
             } else if (directive instanceof SimpleListener) {
                 this.scope.eventNames = directive.events;
             }
-            let objAndKey: ObjAndKey = this.maybeGetObjAndKey(this.base, this.scope);
+            let objAndKey: any = this.maybeGetObjAndKey(this.base, this.scope);
             if (objAndKey.nah) {
                 objAndKey = this.maybeGetObjAndKey(this.base);
             }
@@ -719,7 +720,7 @@ const simpleDirectives: any = {};
             }
             return this.bang ? !value : value;
         }
-        maybeGetObjAndKey(base: string, scope?: object): ObjAndKey {
+        maybeGetObjAndKey(base: string, scope?: object): any {
             const fallback = { nah: true };
             const hasBrackets = base.indexOf("[") !== -1;
             let hasDots = base.indexOf(".") !== -1;
