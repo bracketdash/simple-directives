@@ -271,6 +271,7 @@ const simpleDirectives: any = {};
 
     class SdFor extends SimpleExpression {
         alias: string;
+        originalChildren: number;
         originalHTML: string;
         constructor(directive: SimpleDirective, raw: string) {
             // RAW: alias:reference[:arg:arg:..]
@@ -278,38 +279,29 @@ const simpleDirectives: any = {};
             super(directive, raw, true);
             this.alias = rawParts.shift();
             this.originalHTML = this.directive.element.raw.innerHTML;
+            this.originalChildren = this.directive.element.raw.children.length;
             this.reference = this.assignReference(rawParts.join(":"));
         }
         run(value: any) {
             const $collection = value;
             const simpleElement = this.directive.element;
             const element = simpleElement.raw;
-            Array.from(element.children).forEach((child: HTMLElement) => simpleElement.instance.unregister(child));
             const orphan = document.createElement("div");
-            orphan.innerHTML = this.originalHTML.repeat($collection.length);
-            if (orphan.children.length > element.children.length) {
-                Array.from(orphan.children).forEach((child, index) => {
-                    if (index >= element.children.length) {
-                        element.appendChild(child);
-                    }
-                });
-            } else if (orphan.children.length < element.children.length) {
-                Array.from(element.children).forEach((_, index) => {
-                    if (index >= orphan.children.length) {
-                        element.removeChild(element.lastChild);
-                    }
-                });
+            if (!value) {
+                return;
             }
-            
-            // TODO: the below is not working as expected
-            // it needs to iterate over the repeated markup regardless if there are multiple direct children that go with one loop
-            Array.from(element.children).some((child: HTMLElement, $index: number) => {
+            orphan.innerHTML = this.originalHTML.repeat($collection.length);
+            Array.from(element.children).forEach((child: HTMLElement) => {
+                simpleElement.instance.unregister(child);
+                element.removeChild(child);
+            });
+            Array.from(orphan.children).forEach((child: HTMLElement, index) => {
+                const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.directive.element.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
+                element.appendChild(child);
                 simpleElement.instance.register(child, scope);
             });
-            
-            // if this is a select, re-run the attr in case the selected option wasn't in the dom until just now
             if (element.tagName === "SELECT") {
                 simpleElement.directives.some(directive => {
                     if (directive.type === "attr") {
@@ -563,14 +555,37 @@ const simpleDirectives: any = {};
         get(additionalScope?: object) {
             // leave me be
         }
-        run() {
+        run(skipDiffCheck?: boolean) {
             let currentValue: any = this.get();
-            let tester: string = currentValue;
-            if (typeof tester === "object") {
-                tester = JSON.stringify(tester);
+            let valueChanged = false;
+            if (Array.isArray(currentValue) && Array.isArray(this.value)) {
+                if (currentValue.length !== this.value.length) {
+                    valueChanged = true;
+                } else {
+                    currentValue.some((obj, index) => {
+                        if (obj !== this.value[index]) {
+                            valueChanged = true;
+                            return true;
+                        }
+                    });
+                }
+            } else if (currentValue !== this.value) {
+                valueChanged = true;
             }
-            if (tester !== this.value) {
-                this.value = tester;
+            if (Array.isArray(currentValue)) {
+                currentValue = currentValue.slice(0);
+            }
+            // TODO: test swapping objects in teh array of an sd-for
+            if (valueChanged) {
+                // || skipDiffCheck -- TODO: add back once done debugging
+                if (typeof currentValue === "object") {
+                    // TODO: the values are switched (old value is what I would expect as the new value, and vice versa)
+                    console.log("OLD:");
+                    console.log(JSON.stringify(this.value));
+                    console.log("NEW:");
+                    console.log(JSON.stringify(currentValue));
+                }
+                this.value = currentValue;
                 (SimpleReference.bubbleUp(this) as SimpleExpression).run(currentValue);
             }
         }
@@ -606,7 +621,7 @@ const simpleDirectives: any = {};
             this.left = SimpleReference.getReference(this, raw.substring(0, index));
             this.right = SimpleReference.getReference(this, raw.substring(index + comparator.length));
             if (parent instanceof SimpleExpression) {
-                this.run();
+                this.run(true);
             }
         }
         get(additionalScope?: object) {
@@ -683,7 +698,7 @@ const simpleDirectives: any = {};
                 this.key = objAndKey.key;
             }
             if (parent instanceof SimpleExpression) {
-                this.run();
+                this.run(true);
             }
         }
         get(additionalScope?: object) {
