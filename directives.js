@@ -12,7 +12,7 @@ const simpleDirectives = {};
             const directiveNames = ["sd-attr", "sd-class", "sd-for", "sd-html", "sd-if", "sd-on", "sd-rdo"];
             let element;
             let skipChildren = false;
-            if (target.hasAttributes() && !is(target).oneOf(this.elements.map(e => e.scope.element))) {
+            if (target.hasAttributes()) {
                 let directives = Array.from(target.attributes).map(attribute => {
                     let isNotDupeRdo = true;
                     if (attribute.name === "sd-rdo" && !SdRdo.isFirstRdoOfGroup(this, target)) {
@@ -31,8 +31,10 @@ const simpleDirectives = {};
                     }
                 });
                 removeNulls(directives);
-                element = new SimpleElement(this, target, directives, scope || {});
-                this.elements.push(element);
+                if (directives.length) {
+                    element = new SimpleElement(this, target, directives, Object.assign({}, scope || {}));
+                    this.elements.push(element);
+                }
             }
             if (!element || !skipChildren) {
                 Array.from(target.children).forEach(child => this.register(child, scope));
@@ -48,14 +50,14 @@ const simpleDirectives = {};
             removeNulls(els);
         }
         getSimpleElement(target) {
-            let simpleElement;
-            this.elements.some(element => {
+            let simpleElements = [];
+            this.elements.forEach(element => {
                 if (element.scope.element === target) {
-                    simpleElement = element;
+                    simpleElements.push(element);
                     return true;
                 }
             });
-            return simpleElement;
+            return simpleElements;
         }
     }
     class SimpleElement {
@@ -64,16 +66,18 @@ const simpleDirectives = {};
             this.instance = instance;
             this.scope = scope;
             this.scope.element = element;
+            element.setAttribute("sd-registered", "true");
             directives.forEach(directive => {
-                if (is(directive.name).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(directive.value)) {
+                if (is(directive.type).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(directive.value)) {
                     const split = directive.value.split(";");
-                    split.forEach(exp => this.directives.push(SimpleDirective.getDirective(this, directive.name, exp)));
+                    split.forEach(exp => this.directives.push(SimpleDirective.getDirective(this, directive.type, exp)));
                 } else {
-                    this.directives.push(SimpleDirective.getDirective(this, directive.name, directive.value));
+                    this.directives.push(SimpleDirective.getDirective(this, directive.type, directive.value));
                 }
             });
         }
         unregister() {
+            this.scope.element.removeAttribute("sd-registered");
             this.directives.forEach(directive => {
                 if (directive instanceof SdOn) {
                     directive.destroy();
@@ -114,17 +118,11 @@ const simpleDirectives = {};
                     return new SdRdo(element, expression);
             }
         }
-        static getExpressionParts(expression) {
-            const parts = expression.split(":");
-            const firstPart = parts.shift();
-            const theRest = parts.join(":");
-            return [firstPart, theRest];
-        }
     }
     class SdAttr extends SimpleDirective {
         constructor(element, expression) {
             super(element, expression);
-            const [attribute, reference] = SimpleDirective.getExpressionParts(expression);
+            const [attribute, reference] = splitFirstPart(expression);
             this.attribute = attribute;
             this.scope.attributeName = this.attribute;
             this.reference = SimpleReference.getReference(this, reference);
@@ -151,12 +149,22 @@ const simpleDirectives = {};
     class SdClass extends SimpleDirective {
         constructor(element, expression) {
             super(element, expression);
-            const [classes, reference] = SimpleDirective.getExpressionParts(expression);
+            this.cachedState = 2;
+            const [classes, reference] = splitFirstPart(expression);
             this.classes = classes.split(",");
             this.scope.classNames = this.classes;
             this.reference = SimpleReference.getReference(this, reference);
         }
         run(value) {
+            if (this.cachedState === 2) {
+                this.cachedState = value ? 1 : 0;
+            } else if (value && this.cachedState === 0) {
+                this.cachedState = 1;
+            } else if (!value && this.cachedState === 1) {
+                this.cachedState = 0;
+            } else {
+                return;
+            }
             const element = this.scope.element;
             this.classes.forEach(className => {
                 if (!value) {
@@ -172,35 +180,42 @@ const simpleDirectives = {};
     class SdFor extends SimpleDirective {
         constructor(element, expression) {
             super(element, expression);
-            const [alias, reference] = SimpleDirective.getExpressionParts(expression);
+            const [alias, reference] = splitFirstPart(expression);
             this.alias = alias;
             this.scope.itemName = this.alias;
-            this.reference = SimpleReference.getReference(this, reference);
             this.originalChildren = this.scope.element.children.length;
             this.originalHTML = this.scope.element.innerHTML;
+            this.reference = SimpleReference.getReference(this, reference);
         }
-        run(value) {
-            const $collection = value;
-            const simpleElement = this.element;
-            const element = this.scope.element;
-            const orphan = document.createElement("div");
-            if (!value) {
+        run($collection) {
+            if (!$collection) {
                 return;
             }
+            const { instance, directives } = this.element;
+            const element = this.scope.element;
+            const orphan = document.createElement("div");
             orphan.innerHTML = this.originalHTML.repeat($collection.length);
             Array.from(element.children).forEach(child => {
-                simpleElement.instance.unregister(child);
-                element.removeChild(child);
+                instance.unregister(child);
             });
-            Array.from(orphan.children).forEach((child, index) => {
+            if (element.children.length > orphan.children.length) {
+                Array(element.children.length - orphan.children.length).map(() => {
+                    element.removeChild(element.lastChild);
+                });
+            } else if (element.children.length < orphan.children.length) {
+                const childrenToAdd = Array.from(orphan.children).slice(element.children.length);
+                childrenToAdd.forEach((child, index) => {
+                    element.appendChild(child);
+                });
+            }
+            Array.from(element.children).forEach((child, index) => {
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
-                element.appendChild(child);
-                simpleElement.instance.register(child, scope);
+                instance.register(child, scope);
             });
             if (element.tagName === "SELECT") {
-                simpleElement.directives.some(directive => {
+                directives.some(directive => {
                     if (directive instanceof SdAttr && directive.attribute === "value") {
                         setTimeout(() => directive.run(directive.reference.get()));
                         return true;
@@ -225,14 +240,24 @@ const simpleDirectives = {};
     class SdIf extends SimpleDirective {
         constructor(element, expression) {
             super(element, expression);
+            this.cachedState = 2;
             this.reference = SimpleReference.getReference(this, expression);
         }
         run(value) {
+            if (this.cachedState === 2) {
+                this.cachedState = value ? 1 : 0;
+            } else if (value && this.cachedState === 0) {
+                this.cachedState = 1;
+            } else if (!value && this.cachedState === 1) {
+                this.cachedState = 0;
+            } else {
+                return;
+            }
             const instance = this.element.instance;
             const element = this.scope.element;
             if (value) {
                 element.style.display = null;
-                Array.from(element.children).forEach(child => instance.register(child, this.scope));
+                Array.from(element.children).forEach(child => instance.register(child, Object.assign({}, this.scope)));
             } else {
                 element.style.display = "none";
                 Array.from(element.children).forEach(child => instance.unregister(child));
@@ -272,7 +297,7 @@ const simpleDirectives = {};
     class SdOn extends SimpleDirective {
         constructor(element, expression) {
             super(element, expression);
-            const [events, actions] = SimpleDirective.getExpressionParts(expression);
+            const [events, actions] = splitFirstPart(expression);
             this.events = events.split(",");
             this.scope.eventNames = this.events;
             this.actions = actions.split(",").map(action => {
@@ -308,6 +333,7 @@ const simpleDirectives = {};
     class SimpleAction {
         constructor(directive) {
             this.directive = directive;
+            this.scope = directive.scope;
         }
     }
     class SimpleCaller extends SimpleAction {
@@ -471,13 +497,16 @@ const simpleDirectives = {};
     class SimplePointer extends SimpleReference {
         constructor(parent, pointer, isArg) {
             super(parent);
+            this.args = [];
             this.bang = false;
-            const parts = pointer.split(":");
-            this.base = parts.shift();
-            this.args = parts.map(part => SimpleReference.getReference(this, part, true));
             if (pointer.startsWith("!")) {
                 this.bang = true;
                 pointer = pointer.substring(1);
+            }
+            const [base, args] = splitFirstPart(pointer);
+            this.base = base;
+            if (args) {
+                this.args = args.split(",").map(a => SimpleReference.getReference(this, a, true));
             }
             this.obj = { value: pointer };
             this.key = "value";
@@ -594,8 +623,13 @@ const simpleDirectives = {};
                 currentValue = currentValue.slice(0);
             }
             if (valueChanged || skipDiffCheck) {
+                const directive = SimpleReference.bubbleUp(this);
                 this.value = currentValue;
-                SimpleReference.bubbleUp(this).run(currentValue);
+                try {
+                    directive.run(directive.reference.get());
+                } catch (e) {
+                    setTimeout(() => directive.run(directive.reference.get()));
+                }
             }
         }
     }
@@ -610,6 +644,12 @@ const simpleDirectives = {};
         while ((index = arr.indexOf(null)) !== -1) {
             arr.splice(index, 1);
         }
+    }
+    function splitFirstPart(expression) {
+        const parts = expression.split(":");
+        const firstPart = parts.shift();
+        const theRest = parts.join(":");
+        return [firstPart, theRest];
     }
     simpleDirectives.register = (element, root) => new SimpleRegistrar(element, root);
 })(simpleDirectives);
