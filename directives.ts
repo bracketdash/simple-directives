@@ -157,8 +157,14 @@ const simpleDirectives: any = {};
                 if (element.hasAttribute(this.attribute)) {
                     element.removeAttribute(this.attribute);
                 }
+                if (this.attribute === "value") {
+                    element.value = "";
+                }
             } else {
                 element.setAttribute(this.attribute, value);
+                if (this.attribute === "value") {
+                    element.value = value;
+                }
             }
         }
     }
@@ -223,7 +229,7 @@ const simpleDirectives: any = {};
                 instance.unregister(child);
             });
             if (element.children.length > orphan.children.length) {
-                Array(element.children.length - orphan.children.length).map(() => {
+                Array.from(Array(element.children.length - orphan.children.length)).forEach(() => {
                     element.removeChild(element.lastChild);
                 });
             } else if (element.children.length < orphan.children.length) {
@@ -567,14 +573,14 @@ const simpleDirectives: any = {};
             const [base, args] = splitFirstPart(pointer);
             this.base = base;
             if (args) {
-                this.args = args.split(",").map(a => SimpleReference.getReference(this, a, true));
+                this.args = args.split(":").map(a => SimpleReference.getReference(this, a, true));
             }
             this.obj = { value: pointer };
             this.key = "value";
             let objAndKey: any = this.maybeGetObjAndKey(this.base, this.scope);
             if (objAndKey.nah) {
                 objAndKey = this.maybeGetObjAndKey(this.base);
-            }
+            }            
             if (!objAndKey.nah) {
                 this.obj = objAndKey.obj;
                 this.key = objAndKey.key;
