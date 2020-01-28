@@ -1,54 +1,6 @@
 const simpleDirectives: any = {};
 (function(simpleDirectives) {
-    // CLASSES
-    // > SimpleDirectivesRegistrar
-    // > SimpleElement
-    // > SimpleDirective
-    //  - SdAttr
-    //  - SdClass
-    //  - SdFor
-    //  - SdHtml
-    //  - SdIf
-    //  - SdRdo
-    //  - SdOn
-    // > SimpleAction
-    //  - SimpleCaller
-    //  - SimpleAssigner
-    //  - SimpleUpdater
-    //      - ValueUpdater
-    //      - CheckedUpdater
-    //      - ContentEditableUpdater
-    //      - RadioUpdater
-    // > SimpleReference
-    //  - SimpleComparison
-    //  - SimplePointer
-
-    function is(target: any) {
-        return {
-            oneOf(arr: any[]): boolean {
-                let isOneOf = false;
-                arr.some(item => {
-                    if (item === target) {
-                        isOneOf = true;
-                        return true;
-                    }
-                });
-                return isOneOf;
-            }
-        };
-    }
-
-    function removeNulls(arr: any[]) {
-        let index: number;
-        while ((index = arr.indexOf(null)) !== -1) {
-            arr.splice(index, 1);
-        }
-    }
-
-    // > REGISTRAR
-    // ============================================================================
-
-    class SimpleDirectivesRegistrar {
+    class SimpleRegistrar {
         elements: SimpleElement[] = [];
         pointers: SimplePointer[] = [];
         root: object;
@@ -61,14 +13,14 @@ const simpleDirectives: any = {};
             const directiveNames = ["sd-attr", "sd-class", "sd-for", "sd-html", "sd-if", "sd-on", "sd-rdo"];
             let element: SimpleElement;
             let skipChildren = false;
-            if (target.hasAttributes() && !is(target).oneOf(this.elements.map(se => se.scope.element))) {
+            if (target.hasAttributes() && !is(target).oneOf(this.elements.map(e => e.scope.element))) {
                 let directives = Array.from(target.attributes).map(attribute => {
                     let isNotDupeRdo = true;
                     if (attribute.name === "sd-rdo" && !SdRdo.isFirstRdoOfGroup(this, target as HTMLInputElement)) {
                         isNotDupeRdo = false;
                     }
-                    if (is(attribute.name).oneOf(directiveNames) && isNotDupeRdo) {
-                        if (is(attribute.name).oneOf(["sd-if", "sd-for"])) {
+                    if (is(attribute.name).in(directiveNames) && isNotDupeRdo) {
+                        if (is(attribute.name).in(["sd-if", "sd-for"])) {
                             skipChildren = true;
                         }
                         return {
@@ -89,19 +41,12 @@ const simpleDirectives: any = {};
         }
         runner() {
             this.pointers.forEach((pointer: SimplePointer) => pointer.run());
-            setTimeout(() => {
-                this.runner();
-            }, 200);
+            setTimeout(() => this.runner(), 200);
         }
-        unregister(target: HTMLElement) {
-            this.elements = this.elements.map((element: SimpleElement) => {
-                if (element.scope.element === target || target.contains(element.scope.element)) {
-                    return element.unregister();
-                } else {
-                    return element;
-                }
-            });
-            removeNulls(this.elements);
+        unregister(t: HTMLElement) {
+            let els = this.elements;
+            els = els.map(e => (e.scope.element === t || t.contains(e.scope.element) ? e.unregister() : e));
+            removeNulls(els);
         }
         getSimpleElement(target: HTMLElement) {
             let simpleElement: SimpleElement;
@@ -115,19 +60,16 @@ const simpleDirectives: any = {};
         }
     }
 
-    // > ELEMENTS
-    // ============================================================================
-
     class SimpleElement {
         directives: SimpleDirective[] = [];
-        instance: SimpleDirectivesRegistrar;
+        instance: SimpleRegistrar;
         scope: any;
-        constructor(instance: SimpleDirectivesRegistrar, element: HTMLElement, directives: any[], scope: object) {
+        constructor(instance: SimpleRegistrar, element: HTMLElement, directives: any[], scope: object) {
             this.instance = instance;
             this.scope = scope;
             this.scope.element = element;
             directives.forEach(directive => {
-                if (is(directive.name).oneOf(["sd-attr", "sd-class", "sd-on"]) && directive.value.indexOf(";") !== -1) {
+                if (is(directive.name).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(directive.value)) {
                     const split = directive.value.split(";");
                     split.forEach(exp => this.directives.push(SimpleDirective.getDirective(this, directive.name, exp)));
                 } else {
@@ -153,9 +95,6 @@ const simpleDirectives: any = {};
         }
     }
 
-    // > DIRECTIVES
-    // ============================================================================
-
     class SimpleDirective {
         element: SimpleElement;
         expression: string;
@@ -165,7 +104,7 @@ const simpleDirectives: any = {};
             this.expression = expression;
             this.scope = element.scope;
         }
-        static getDirective(element: SimpleElement, name: string, expression: string): SimpleDirective {
+        static getDirective(element: SimpleElement, name: string, expression: string) {
             switch (name.substring(3)) {
                 case "attr":
                     return new SdAttr(element, expression);
@@ -205,7 +144,7 @@ const simpleDirectives: any = {};
             const element = this.scope.element;
             if (this.attribute === "value" && element.tagName === "SELECT") {
                 Array.from(element.getElementsByTagName("option")).forEach((optionElement: HTMLOptionElement) => {
-                    if ((Array.isArray(value) && is(optionElement.value).oneOf(value)) || value == optionElement.value) {
+                    if ((Array.isArray(value) && is(optionElement.value).in(value)) || value == optionElement.value) {
                         optionElement.selected = true;
                     } else {
                         optionElement.selected = false;
@@ -341,7 +280,7 @@ const simpleDirectives: any = {};
                 }
             });
         }
-        static isFirstRdoOfGroup(instance: SimpleDirectivesRegistrar, target: HTMLInputElement) {
+        static isFirstRdoOfGroup(instance: SimpleRegistrar, target: HTMLInputElement) {
             let isFirst = true;
             instance.elements.some(({ scope }) => {
                 if (
@@ -357,7 +296,7 @@ const simpleDirectives: any = {};
     }
 
     class SdOn extends SimpleDirective {
-        actions: SimpleAction[];
+        actions: (SimpleAssigner | SimpleCaller | ValueUpdater | CheckedUpdater | ContentEditableUpdater | RadioUpdater)[];
         events: string[];
         listener: EventListener;
         constructor(element: SimpleElement, expression: string) {
@@ -368,35 +307,22 @@ const simpleDirectives: any = {};
             this.actions = actions.split(",").map(action => {
                 if (action === "$update") {
                     return this.getUpdater();
-                } else if (action.indexOf("=") !== -1) {
+                } else if (is("=").in(action)) {
                     return new SimpleAssigner(this, action);
                 } else {
                     return new SimpleCaller(this, action);
                 }
             });
-            this.listener = event =>
-                this.actions.forEach(
-                    (
-                        action:
-                            | CheckedUpdater
-                            | ValueUpdater
-                            | ContentEditableUpdater
-                            | RadioUpdater
-                            | SimpleAssigner
-                            | SimpleCaller
-                    ) => {
-                        action.run(event);
-                    }
-                );
+            this.listener = event => this.actions.forEach(action => action.run(event));
             this.events.forEach(event => this.scope.element.addEventListener(event, this.listener));
         }
         destroy() {
             this.events.forEach(event => this.scope.element.removeEventListener(event, this.listener));
         }
-        getUpdater(): SimpleUpdater {
+        getUpdater(): ValueUpdater | CheckedUpdater | ContentEditableUpdater | RadioUpdater {
             const element = this.scope.element;
             if (element.hasAttribute("sd-attr")) {
-                if (element.tagName === "INPUT" && is(element.getAttribute("type")).oneOf(["checkbox", "radio"])) {
+                if (element.tagName === "INPUT" && is(element.getAttribute("type")).in(["checkbox", "radio"])) {
                     return new CheckedUpdater(this);
                 } else {
                     return new ValueUpdater(this);
@@ -408,9 +334,6 @@ const simpleDirectives: any = {};
             }
         }
     }
-
-    // ACTIONS
-    // ============================================================================
 
     class SimpleAction {
         directive: SdOn;
@@ -538,9 +461,6 @@ const simpleDirectives: any = {};
         }
     }
 
-    // REFERENCES
-    // ============================================================================
-
     class SimpleReference {
         parent: SimpleDirective | SimpleReference | SimpleAction;
         scope: any;
@@ -646,8 +566,8 @@ const simpleDirectives: any = {};
         }
         maybeGetObjAndKey(base: string, scope?: object): any {
             const fallback = { nah: true };
-            const hasBrackets = base.indexOf("[") !== -1;
-            let hasDots = base.indexOf(".") !== -1;
+            const hasBrackets = is("[").in(base);
+            let hasDots = is(".").in(base);
             let obj: object;
             if (scope) {
                 obj = scope;
@@ -737,8 +657,19 @@ const simpleDirectives: any = {};
         }
     }
 
-    // > INITIALIZATION
-    // ============================================================================
+    function is(target: any) {
+        return {
+            in: str => str.indexOf(target) !== -1,
+            oneOf: arr => arr.some(item => item === target)
+        };
+    }
 
-    simpleDirectives.register = (element?: HTMLElement, root?: object) => new SimpleDirectivesRegistrar(element, root);
+    function removeNulls(arr: any[]) {
+        let index: number;
+        while ((index = arr.indexOf(null)) !== -1) {
+            arr.splice(index, 1);
+        }
+    }
+
+    simpleDirectives.register = (element?: HTMLElement, root?: object) => new SimpleRegistrar(element, root);
 })(simpleDirectives);
