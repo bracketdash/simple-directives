@@ -1,5 +1,9 @@
 const simpleDirectives: any = {};
 (function(simpleDirectives) {
+    type AnyUpdater = ValueUpdater | CheckedUpdater | ContentEditableUpdater | RadioUpdater;
+    type Binders = SdAttr | SdClass | SdFor | SdHtml | SdIf | SdRdo;
+    type ReferenceParent = SimpleAction | SimpleDirective | SimpleReference;
+
     interface PreDirective {
         type: string;
         value: string;
@@ -15,22 +19,19 @@ const simpleDirectives: any = {};
             this.runner();
         }
         register(target: HTMLElement, scope?: object) {
-            const directiveNames = ["sd-attr", "sd-class", "sd-for", "sd-html", "sd-if", "sd-on", "sd-rdo"];
+            const directiveNames = Object.keys(directiveClasses).map(k => k.replace("d", "d-").toLowerCase());
             let element: SimpleElement;
             let skipChildren = false;
             if (target.hasAttributes()) {
-                let directives: PreDirective[] = Array.from(target.attributes).map(attribute => {
-                    let isNotDupeRdo = true;
-                    if (attribute.name === "sd-rdo" && !SdRdo.isFirstRdoOfGroup(this, target as HTMLInputElement)) {
-                        isNotDupeRdo = false;
-                    }
-                    if (is(attribute.name).in(directiveNames) && isNotDupeRdo) {
-                        if (is(attribute.name).in(["sd-if", "sd-for"])) {
+                let directives: PreDirective[] = Array.from(target.attributes).map(({ name, value }) => {
+                    const isNotDupeRdo = name !== "sd-rdo" || SdRdo.isFirstRdoOfGroup(this, target as HTMLInputElement);
+                    if (is(name).in(directiveNames) && isNotDupeRdo) {
+                        if (is(name).in(["sd-if", "sd-for"])) {
                             skipChildren = true;
                         }
                         return {
-                            type: attribute.name,
-                            value: attribute.value.replace(/\s+/g, "")
+                            type: name,
+                            value: value.replace(/\s+/g, "")
                         };
                     } else {
                         return null;
@@ -50,17 +51,18 @@ const simpleDirectives: any = {};
             this.pointers.forEach((pointer: SimplePointer) => pointer.run());
             setTimeout(() => this.runner(), 200);
         }
-        unregister(t: HTMLElement) {
-            let els = this.elements;
-            els = els.map(e => (e.scope.element === t || t.contains(e.scope.element) ? e.unregister() : e));
-            removeNulls(els);
+        unregister(target: HTMLElement) {
+            this.elements = this.elements.map(element => {
+                const { scope, unregister } = element;
+                return scope.element === target || target.contains(scope.element) ? unregister() : element;
+            });
+            removeNulls(this.elements);
         }
         getSimpleElement(target: HTMLElement) {
             let simpleElements: SimpleElement[] = [];
-            this.elements.forEach((element: SimpleElement) => {
+            this.elements.forEach(element => {
                 if (element.scope.element === target) {
                     simpleElements.push(element);
-                    return true;
                 }
             });
             return simpleElements;
@@ -72,16 +74,15 @@ const simpleDirectives: any = {};
         instance: SimpleRegistrar;
         scope: any;
         constructor(instance: SimpleRegistrar, element: HTMLElement, directives: PreDirective[], scope: object) {
-            this.instance = instance;
-            this.scope = scope;
+            Object.assign(this, { instance, scope });
             this.scope.element = element;
             element.setAttribute("sd-registered", "true");
-            directives.forEach(directive => {
-                if (is(directive.type).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(directive.value)) {
-                    const split = directive.value.split(";");
-                    split.forEach(exp => this.directives.push(SimpleDirective.getDirective(this, directive.type, exp)));
+            directives.forEach(({ type, value }) => {
+                if (is(type).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(value)) {
+                    const split = value.split(";");
+                    split.forEach(exp => this.directives.push(SimpleDirective.getDirective(this, type, exp)));
                 } else {
-                    this.directives.push(SimpleDirective.getDirective(this, directive.type, directive.value));
+                    this.directives.push(SimpleDirective.getDirective(this, type, value));
                 }
             });
         }
@@ -95,7 +96,7 @@ const simpleDirectives: any = {};
                     this.scope.element.innerHTML = directive.originalHTML;
                 }
             });
-            this.instance.pointers = this.instance.pointers.map((pointer: SimplePointer) => {
+            this.instance.pointers = this.instance.pointers.map(pointer => {
                 const parent = SimpleReference.bubbleUp(pointer) as SimpleDirective;
                 return parent.element === this ? null : pointer;
             });
@@ -109,27 +110,11 @@ const simpleDirectives: any = {};
         expression: string;
         scope: any;
         constructor(element: SimpleElement, expression: string) {
-            this.element = element;
-            this.expression = expression;
-            this.scope = element.scope;
+            Object.assign(this, { element, expression, scope: element.scope });
         }
         static getDirective(element: SimpleElement, name: string, expression: string) {
-            switch (name.substring(3)) {
-                case "attr":
-                    return new SdAttr(element, expression);
-                case "class":
-                    return new SdClass(element, expression);
-                case "for":
-                    return new SdFor(element, expression);
-                case "html":
-                    return new SdHtml(element, expression);
-                case "if":
-                    return new SdIf(element, expression);
-                case "on":
-                    return new SdOn(element, expression);
-                case "rdo":
-                    return new SdRdo(element, expression);
-            }
+            const className = "Sd" + name.substring(3, 4).toUpperCase() + name.substring(4);
+            return new directiveClasses[className](element, expression);
         }
     }
 
@@ -140,12 +125,13 @@ const simpleDirectives: any = {};
             super(element, expression);
             const [attribute, reference] = splitFirstPart(expression);
             this.attribute = attribute;
-            this.scope.attributeName = this.attribute;
+            this.scope.attributeName = attribute;
             this.reference = SimpleReference.getReference(this, reference);
         }
         run(value: any) {
+            const attribute = this.attribute;
             const element = this.scope.element;
-            if (this.attribute === "value" && element.tagName === "SELECT") {
+            if (attribute === "value" && element.tagName === "SELECT") {
                 Array.from(element.getElementsByTagName("option")).forEach((optionElement: HTMLOptionElement) => {
                     if ((Array.isArray(value) && is(optionElement.value).in(value)) || value == optionElement.value) {
                         optionElement.selected = true;
@@ -154,15 +140,15 @@ const simpleDirectives: any = {};
                     }
                 });
             } else if (!value) {
-                if (element.hasAttribute(this.attribute)) {
-                    element.removeAttribute(this.attribute);
+                if (element.hasAttribute(attribute)) {
+                    element.removeAttribute(attribute);
                 }
-                if (this.attribute === "value") {
+                if (attribute === "value") {
                     element.value = "";
                 }
             } else {
-                element.setAttribute(this.attribute, value);
-                if (this.attribute === "value") {
+                element.setAttribute(attribute, value);
+                if (attribute === "value") {
                     element.value = value;
                 }
             }
@@ -190,14 +176,14 @@ const simpleDirectives: any = {};
             } else {
                 return;
             }
-            const element = this.scope.element;
+            const classList = this.scope.element.classList;
             this.classes.forEach(className => {
                 if (!value) {
-                    if (element.classList.contains(className)) {
-                        element.classList.remove(className);
+                    if (classList.contains(className)) {
+                        classList.remove(className);
                     }
-                } else if (!element.classList.contains(className)) {
-                    element.classList.add(className);
+                } else if (!classList.contains(className)) {
+                    classList.add(className);
                 }
             });
         }
@@ -211,10 +197,12 @@ const simpleDirectives: any = {};
         constructor(element: SimpleElement, expression: string) {
             super(element, expression);
             const [alias, reference] = splitFirstPart(expression);
-            this.alias = alias;
+            Object.assign(this, {
+                alias,
+                originalChildren: this.scope.element.children.length,
+                originalHTML: this.scope.element.innerHTML
+            });
             this.scope.itemName = this.alias;
-            this.originalChildren = this.scope.element.children.length;
-            this.originalHTML = this.scope.element.innerHTML;
             this.reference = SimpleReference.getReference(this, reference);
         }
         run($collection: any) {
@@ -222,29 +210,29 @@ const simpleDirectives: any = {};
                 return;
             }
             const { instance, directives } = this.element;
-            const element = this.scope.element;
+            const { appendChild, children, lastChild, removeChild, tagName } = this.scope.element;
             const orphan = document.createElement("div");
             orphan.innerHTML = this.originalHTML.repeat($collection.length);
-            Array.from(element.children).forEach((child: HTMLElement) => {
+            Array.from(children).forEach((child: HTMLElement) => {
                 instance.unregister(child);
             });
-            if (element.children.length > orphan.children.length) {
-                Array.from(Array(element.children.length - orphan.children.length)).forEach(() => {
-                    element.removeChild(element.lastChild);
+            if (children.length > orphan.children.length) {
+                Array.from(Array(children.length - orphan.children.length)).forEach(() => {
+                    removeChild(lastChild);
                 });
-            } else if (element.children.length < orphan.children.length) {
-                const childrenToAdd = Array.from(orphan.children).slice(element.children.length);
-                childrenToAdd.forEach((child: HTMLElement, index) => {
-                    element.appendChild(child);
+            } else if (children.length < orphan.children.length) {
+                const childrenToAdd = Array.from(orphan.children).slice(children.length);
+                childrenToAdd.forEach((child: HTMLElement) => {
+                    appendChild(child);
                 });
             }
-            Array.from(element.children).forEach((child: HTMLElement, index) => {
+            Array.from(children).forEach((child: HTMLElement, index) => {
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
                 instance.register(child, scope);
             });
-            if (element.tagName === "SELECT") {
+            if (tagName === "SELECT") {
                 directives.some(directive => {
                     if (directive instanceof SdAttr && directive.attribute === "value") {
                         setTimeout(() => directive.run(directive.reference.get()));
@@ -287,14 +275,14 @@ const simpleDirectives: any = {};
             } else {
                 return;
             }
-            const instance = this.element.instance;
-            const element = this.scope.element;
+            const { register, unregister } = this.element.instance;
+            const { style, children } = this.scope.element;
             if (value) {
-                element.style.display = null;
-                Array.from(element.children).forEach((child: HTMLElement) => instance.register(child, Object.assign({}, this.scope)));
+                style.display = null;
+                Array.from(children).forEach((child: HTMLElement) => register(child, Object.assign({}, this.scope)));
             } else {
-                element.style.display = "none";
-                Array.from(element.children).forEach((child: HTMLElement) => instance.unregister(child));
+                style.display = "none";
+                Array.from(children).forEach((child: HTMLElement) => unregister(child));
             }
         }
     }
@@ -332,7 +320,7 @@ const simpleDirectives: any = {};
     }
 
     class SdOn extends SimpleDirective {
-        actions: (SimpleAssigner | SimpleCaller | ValueUpdater | CheckedUpdater | ContentEditableUpdater | RadioUpdater)[];
+        actions: (SimpleAssigner | SimpleCaller | AnyUpdater)[];
         events: string[];
         listener: EventListener;
         constructor(element: SimpleElement, expression: string) {
@@ -355,7 +343,7 @@ const simpleDirectives: any = {};
         destroy() {
             this.events.forEach(event => this.scope.element.removeEventListener(event, this.listener));
         }
-        getUpdater(): ValueUpdater | CheckedUpdater | ContentEditableUpdater | RadioUpdater {
+        getUpdater(): AnyUpdater {
             const element = this.scope.element;
             if (element.hasAttribute("sd-attr")) {
                 if (element.tagName === "INPUT" && is(element.getAttribute("type")).in(["checkbox", "radio"])) {
@@ -469,8 +457,8 @@ const simpleDirectives: any = {};
             });
         }
         run() {
-            const element = this.scope.element as HTMLInputElement;
-            this.updatee.obj[this.updatee.key] = element.innerHTML;
+            const { innerHTML } = this.scope.element as HTMLInputElement;
+            this.updatee.obj[this.updatee.key] = innerHTML;
         }
     }
 
@@ -499,9 +487,9 @@ const simpleDirectives: any = {};
     }
 
     class SimpleReference {
-        parent: SimpleDirective | SimpleReference | SimpleAction;
+        parent: ReferenceParent;
         scope: any;
-        constructor(parent: SimpleDirective | SimpleReference | SimpleAction) {
+        constructor(parent: ReferenceParent) {
             this.parent = parent;
             this.scope = parent.scope;
         }
@@ -512,7 +500,7 @@ const simpleDirectives: any = {};
             }
             return parent;
         }
-        static getReference(parent: SimpleDirective | SimpleReference | SimpleAction, reference: string, isArg?: boolean) {
+        static getReference(parent: ReferenceParent, reference: string, isArg?: boolean) {
             if (/[=<!>]/.test(reference.substring(1))) {
                 return new SimpleComparison(parent, reference, isArg);
             } else {
@@ -525,7 +513,7 @@ const simpleDirectives: any = {};
         left: SimplePointer | SimpleComparison;
         comparator: string;
         right: SimplePointer | SimpleComparison;
-        constructor(parent: SimpleDirective | SimpleReference | SimpleAction, comparison: string, isArg?: boolean) {
+        constructor(parent: ReferenceParent, comparison: string, isArg?: boolean) {
             super(parent);
             const comparator = comparison.match(/([=<!>]{1,3})/)[0];
             const index = comparison.indexOf(comparator);
@@ -564,7 +552,8 @@ const simpleDirectives: any = {};
         key: string;
         obj: object;
         value: any;
-        constructor(parent: SimpleDirective | SimpleAction | SimpleReference, pointer: string, isArg?: boolean) {
+
+        constructor(parent: ReferenceParent, pointer: string, isArg?: boolean) {
             super(parent);
             if (pointer.startsWith("!")) {
                 this.bang = true;
@@ -580,7 +569,7 @@ const simpleDirectives: any = {};
             let objAndKey: any = this.maybeGetObjAndKey(this.base, this.scope);
             if (objAndKey.nah) {
                 objAndKey = this.maybeGetObjAndKey(this.base);
-            }            
+            }
             if (!objAndKey.nah) {
                 this.obj = objAndKey.obj;
                 this.key = objAndKey.key;
@@ -593,6 +582,7 @@ const simpleDirectives: any = {};
                 }
             }
         }
+
         get() {
             let value: any = this.obj[this.key];
             if (typeof value === "function") {
@@ -603,6 +593,7 @@ const simpleDirectives: any = {};
             }
             return this.bang ? !value : value;
         }
+
         maybeGetObjAndKey(base: string, scope?: object): any {
             const fallback = { nah: true };
             const hasBrackets = is("[").in(base);
@@ -623,22 +614,18 @@ const simpleDirectives: any = {};
                 return fallback;
             }
             if (!hasBrackets && !hasDots) {
-                if (obj.hasOwnProperty(base)) {
-                    return { obj, key: base };
-                } else {
-                    return fallback;
-                }
+                return obj.hasOwnProperty(base) ? { obj, key: base } : fallback;
             } else {
                 if (hasBrackets) {
                     let foundPath = true;
                     while (/\[[^\[\]]*\]/.test(base)) {
                         base = base.replace(/\[([^\[\]]*)\]/g, (_, capture) => {
-                            const cr = this.maybeGetObjAndKey(capture, scope);
-                            if (!cr.key) {
+                            const { obj, key } = this.maybeGetObjAndKey(capture, scope);
+                            if (!key) {
                                 foundPath = false;
                                 return "";
                             }
-                            return "." + cr.obj[cr.key];
+                            return "." + obj[key];
                         });
                     }
                     if (!foundPath) {
@@ -661,14 +648,11 @@ const simpleDirectives: any = {};
                             return true;
                         }
                     });
-                    if (typeof key === "string") {
-                        return { obj, key };
-                    } else {
-                        return fallback;
-                    }
+                    return typeof key === "string" ? { obj, key } : fallback;
                 }
             }
         }
+
         run(skipDiffCheck?: boolean) {
             let currentValue: any = this.get();
             let valueChanged = false;
@@ -690,12 +674,12 @@ const simpleDirectives: any = {};
                 currentValue = currentValue.slice(0);
             }
             if (valueChanged || skipDiffCheck) {
-                const directive = SimpleReference.bubbleUp(this) as SdAttr | SdClass | SdFor | SdHtml | SdIf | SdRdo;
+                const { reference, run } = SimpleReference.bubbleUp(this) as Binders;
                 this.value = currentValue;
                 try {
-                    directive.run(directive.reference.get());
+                    run(reference.get());
                 } catch (e) {
-                    setTimeout(() => directive.run(directive.reference.get()));
+                    setTimeout(() => run(reference.get()));
                 }
             }
         }
@@ -721,6 +705,8 @@ const simpleDirectives: any = {};
         const theRest = parts.join(":");
         return [firstPart, theRest];
     }
+
+    const directiveClasses = { SdAttr, SdClass, SdFor, SdHtml, SdIf, SdRdo, SdOn };
 
     simpleDirectives.register = (element?: HTMLElement, root?: object) => new SimpleRegistrar(element, root);
 })(simpleDirectives);
