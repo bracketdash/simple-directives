@@ -1,5 +1,5 @@
 const simpleDirectives = {};
-(function (simpleDirectives) {
+(function(simpleDirectives) {
     class SimpleRegistrar {
         constructor(element, root) {
             this.elements = [];
@@ -19,12 +19,8 @@ const simpleDirectives = {};
                         if (is(name).in(["sd-if", "sd-for"])) {
                             skipChildren = true;
                         }
-                        return {
-                            type: name,
-                            value: value.replace(/\s+/g, "")
-                        };
-                    }
-                    else {
+                        return { type: name, value: value.replace(/\s+/g, "") };
+                    } else {
                         return null;
                     }
                 });
@@ -35,11 +31,11 @@ const simpleDirectives = {};
                 }
             }
             if (!element || !skipChildren) {
-                Array.from(target.children).forEach((child) => this.register(child, scope));
+                Array.from(target.children).forEach(child => this.register(child, scope));
             }
         }
         runner() {
-            this.pointers.forEach((pointer) => pointer.run());
+            this.pointers.forEach(pointer => pointer.run());
             setTimeout(() => this.runner(), 200);
         }
         unregister(target) {
@@ -69,8 +65,7 @@ const simpleDirectives = {};
                 if (is(type).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(value)) {
                     const split = value.split(";");
                     split.forEach(exp => this.directives.push(SimpleDirective.getDirective(this, type, exp)));
-                }
-                else {
+                } else {
                     this.directives.push(SimpleDirective.getDirective(this, type, value));
                 }
             });
@@ -114,24 +109,21 @@ const simpleDirectives = {};
             const attribute = this.attribute;
             const element = this.scope.element;
             if (attribute === "value" && element.tagName === "SELECT") {
-                Array.from(element.getElementsByTagName("option")).forEach((optionElement) => {
+                Array.from(element.getElementsByTagName("option")).forEach(optionElement => {
                     if ((Array.isArray(value) && is(optionElement.value).in(value)) || value == optionElement.value) {
                         optionElement.selected = true;
-                    }
-                    else {
+                    } else {
                         optionElement.selected = false;
                     }
                 });
-            }
-            else if (!value) {
+            } else if (!value) {
                 if (element.hasAttribute(attribute)) {
                     element.removeAttribute(attribute);
                 }
                 if (attribute === "value") {
                     element.value = "";
                 }
-            }
-            else {
+            } else {
                 element.setAttribute(attribute, value);
                 if (attribute === "value") {
                     element.value = value;
@@ -151,14 +143,11 @@ const simpleDirectives = {};
         run(value) {
             if (this.cachedState === 2) {
                 this.cachedState = value ? 1 : 0;
-            }
-            else if (value && this.cachedState === 0) {
+            } else if (value && this.cachedState === 0) {
                 this.cachedState = 1;
-            }
-            else if (!value && this.cachedState === 1) {
+            } else if (!value && this.cachedState === 1) {
                 this.cachedState = 0;
-            }
-            else {
+            } else {
                 return;
             }
             const classList = this.scope.element.classList;
@@ -167,8 +156,7 @@ const simpleDirectives = {};
                     if (classList.contains(className)) {
                         classList.remove(className);
                     }
-                }
-                else if (!classList.contains(className)) {
+                } else if (!classList.contains(className)) {
                     classList.add(className);
                 }
             });
@@ -194,17 +182,16 @@ const simpleDirectives = {};
             const { appendChild, children, lastChild, removeChild, tagName } = this.scope.element;
             const orphan = document.createElement("div");
             orphan.innerHTML = this.originalHTML.repeat($collection.length);
-            Array.from(children).forEach((child) => {
+            Array.from(children).forEach(child => {
                 instance.unregister(child);
             });
             if (children.length > orphan.children.length) {
                 Array.from(Array(children.length - orphan.children.length)).forEach(() => {
                     removeChild(lastChild);
                 });
-            }
-            else if (children.length < orphan.children.length) {
+            } else if (children.length < orphan.children.length) {
                 const childrenToAdd = Array.from(orphan.children).slice(children.length);
-                childrenToAdd.forEach((child) => {
+                childrenToAdd.forEach(child => {
                     appendChild(child);
                 });
             }
@@ -232,9 +219,9 @@ const simpleDirectives = {};
         run(value) {
             const instance = this.element.instance;
             const element = this.scope.element;
-            Array.from(element.children).forEach((child) => instance.unregister(child));
+            Array.from(element.children).forEach(child => instance.unregister(child));
             element.innerHTML = value;
-            Array.from(element.children).forEach((child) => instance.register(child, this.scope));
+            Array.from(element.children).forEach(child => instance.register(child, this.scope));
         }
     }
     class SdIf extends SimpleDirective {
@@ -246,25 +233,21 @@ const simpleDirectives = {};
         run(value) {
             if (this.cachedState === 2) {
                 this.cachedState = value ? 1 : 0;
-            }
-            else if (value && this.cachedState === 0) {
+            } else if (value && this.cachedState === 0) {
                 this.cachedState = 1;
-            }
-            else if (!value && this.cachedState === 1) {
+            } else if (!value && this.cachedState === 1) {
                 this.cachedState = 0;
-            }
-            else {
+            } else {
                 return;
             }
             const { register, unregister } = this.element.instance;
             const { style, children } = this.scope.element;
             if (value) {
                 style.display = null;
-                Array.from(children).forEach((child) => register(child, Object.assign({}, this.scope)));
-            }
-            else {
+                Array.from(children).forEach(child => register(child, Object.assign({}, this.scope)));
+            } else {
                 style.display = "none";
-                Array.from(children).forEach((child) => unregister(child));
+                Array.from(children).forEach(child => unregister(child));
             }
         }
     }
@@ -276,11 +259,10 @@ const simpleDirectives = {};
         run(value) {
             const groupName = this.scope.element.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
-            radioInputs.forEach((radioInput) => {
+            radioInputs.forEach(radioInput => {
                 if (radioInput.value === value) {
                     radioInput.checked = true;
-                }
-                else {
+                } else {
                     radioInput.checked = false;
                 }
             });
@@ -288,9 +270,11 @@ const simpleDirectives = {};
         static isFirstRdoOfGroup(instance, target) {
             let isFirst = true;
             instance.elements.some(({ scope }) => {
-                if (scope.element.tagName === "INPUT" &&
+                if (
+                    scope.element.tagName === "INPUT" &&
                     scope.element.getAttribute("type") === "radio" &&
-                    scope.element.getAttribute("name") === target.getAttribute("name")) {
+                    scope.element.getAttribute("name") === target.getAttribute("name")
+                ) {
                     isFirst = false;
                 }
             });
@@ -306,11 +290,9 @@ const simpleDirectives = {};
             this.actions = actions.split(",").map(action => {
                 if (action === "$update") {
                     return this.getUpdater();
-                }
-                else if (is("=").in(action)) {
+                } else if (is("=").in(action)) {
                     return new SimpleAssigner(this, action);
-                }
-                else {
+                } else {
                     return new SimpleCaller(this, action);
                 }
             });
@@ -325,15 +307,12 @@ const simpleDirectives = {};
             if (element.hasAttribute("sd-attr")) {
                 if (element.tagName === "INPUT" && is(element.getAttribute("type")).in(["checkbox", "radio"])) {
                     return new CheckedUpdater(this);
-                }
-                else {
+                } else {
                     return new ValueUpdater(this);
                 }
-            }
-            else if (element.hasAttribute("sd-html") && element.isContentEditable) {
+            } else if (element.hasAttribute("sd-html") && element.isContentEditable) {
                 return new ContentEditableUpdater(this);
-            }
-            else if (element.hasAttribute("sd-rdo")) {
+            } else if (element.hasAttribute("sd-rdo")) {
                 return new RadioUpdater(this);
             }
         }
@@ -351,7 +330,7 @@ const simpleDirectives = {};
         }
         run(event) {
             const callee = this.callee.obj[this.callee.key];
-            const args = this.callee.args.map((arg) => {
+            const args = this.callee.args.map(arg => {
                 return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
             });
             callee.apply(Object.assign({ event: event }, this.scope), args);
@@ -369,15 +348,16 @@ const simpleDirectives = {};
             this.left.obj[this.left.key] = right;
         }
     }
-    class SimpleUpdater extends SimpleAction {
-    }
+    class SimpleUpdater extends SimpleAction {}
     class ValueUpdater extends SimpleUpdater {
         constructor(directive) {
             super(directive);
             this.directive.element.directives.some(directive => {
-                if (directive instanceof SdAttr &&
+                if (
+                    directive instanceof SdAttr &&
                     directive.attribute === "value" &&
-                    directive.reference instanceof SimplePointer) {
+                    directive.reference instanceof SimplePointer
+                ) {
                     this.updatee = directive.reference;
                     return true;
                 }
@@ -387,8 +367,7 @@ const simpleDirectives = {};
             const value = this.scope.element.value;
             if (typeof this.updatee.obj[this.updatee.key] === "number" && !isNaN(Number(value))) {
                 this.updatee.obj[this.updatee.key] = Number(value);
-            }
-            else {
+            } else {
                 this.updatee.obj[this.updatee.key] = value;
             }
         }
@@ -397,9 +376,11 @@ const simpleDirectives = {};
         constructor(directive) {
             super(directive);
             this.directive.element.directives.some(directive => {
-                if (directive instanceof SdAttr &&
+                if (
+                    directive instanceof SdAttr &&
                     directive.attribute === "checked" &&
-                    directive.reference instanceof SimplePointer) {
+                    directive.reference instanceof SimplePointer
+                ) {
                     this.updatee = directive.reference;
                     return true;
                 }
@@ -439,7 +420,7 @@ const simpleDirectives = {};
             const groupName = this.scope.element.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
             let value;
-            radioInputs.some((radioInput) => {
+            radioInputs.some(radioInput => {
                 if (radioInput.checked) {
                     value = radioInput.value;
                     return true;
@@ -463,8 +444,7 @@ const simpleDirectives = {};
         static getReference(parent, reference, isArg) {
             if (/[=<!>]/.test(reference.substring(1))) {
                 return new SimpleComparison(parent, reference, isArg);
-            }
-            else {
+            } else {
                 return new SimplePointer(parent, reference, isArg);
             }
         }
@@ -536,7 +516,7 @@ const simpleDirectives = {};
         get() {
             let value = this.obj[this.key];
             if (typeof value === "function") {
-                const args = this.args.map((arg) => {
+                const args = this.args.map(arg => {
                     return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
                 });
                 value = value.apply(this.scope, args);
@@ -550,13 +530,11 @@ const simpleDirectives = {};
             let obj;
             if (scope) {
                 obj = scope;
-            }
-            else {
+            } else {
                 let root = SimpleReference.bubbleUp(this);
                 if (root instanceof SimpleDirective) {
                     root = root.element.instance.root;
-                }
-                else {
+                } else {
                     root = root.directive.element.instance.root;
                 }
                 obj = root;
@@ -566,8 +544,7 @@ const simpleDirectives = {};
             }
             if (!hasBrackets && !hasDots) {
                 return obj.hasOwnProperty(base) ? { obj, key: base } : fallback;
-            }
-            else {
+            } else {
                 if (hasBrackets) {
                     let foundPath = true;
                     while (/\[[^\[\]]*\]/.test(base)) {
@@ -593,11 +570,9 @@ const simpleDirectives = {};
                     parts.some((part, index) => {
                         if (index === parts.length - 1) {
                             key = part;
-                        }
-                        else if (typeof obj === "object" && obj.hasOwnProperty(part)) {
+                        } else if (typeof obj === "object" && obj.hasOwnProperty(part)) {
                             obj = obj[part];
-                        }
-                        else {
+                        } else {
                             key = false;
                             return true;
                         }
@@ -612,8 +587,7 @@ const simpleDirectives = {};
             if (Array.isArray(currentValue) && Array.isArray(this.value)) {
                 if (currentValue.length !== this.value.length) {
                     valueChanged = true;
-                }
-                else {
+                } else {
                     currentValue.some((obj, index) => {
                         if (obj !== this.value[index]) {
                             valueChanged = true;
@@ -621,8 +595,7 @@ const simpleDirectives = {};
                         }
                     });
                 }
-            }
-            else if (currentValue !== this.value) {
+            } else if (currentValue !== this.value) {
                 valueChanged = true;
             }
             if (Array.isArray(currentValue)) {
@@ -633,8 +606,7 @@ const simpleDirectives = {};
                 this.value = currentValue;
                 try {
                     run(reference.get());
-                }
-                catch (e) {
+                } catch (e) {
                     setTimeout(() => run(reference.get()));
                 }
             }
