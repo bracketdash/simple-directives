@@ -60,8 +60,9 @@ const simpleDirectives: any = {};
 
         unregister(target: HTMLElement) {
             this.elements = this.elements.map(element => {
-                const { scope, unregister } = element;
-                return scope.element === target || target.contains(scope.element) ? unregister() : element;
+                return element.scope.element === target || target.contains(element.scope.element)
+                    ? element.unregister()
+                    : element;
             });
             removeNulls(this.elements);
         }
@@ -246,7 +247,8 @@ const simpleDirectives: any = {};
             }
 
             const { instance, directives } = this.element;
-            const { appendChild, children, lastChild, removeChild, tagName } = this.scope.element;
+            const element = this.scope.element;
+            const children = this.scope.element.children;
             const orphan = document.createElement("div");
 
             orphan.innerHTML = this.originalHTML.repeat($collection.length);
@@ -257,23 +259,24 @@ const simpleDirectives: any = {};
 
             if (children.length > orphan.children.length) {
                 Array.from(Array(children.length - orphan.children.length)).forEach(() => {
-                    removeChild(lastChild);
+                    element.removeChild(element.lastChild);
                 });
             } else if (children.length < orphan.children.length) {
                 const childrenToAdd = Array.from(orphan.children).slice(children.length);
                 childrenToAdd.forEach((child: HTMLElement) => {
-                    appendChild(child);
+                    element.appendChild(child);
                 });
             }
 
             Array.from(children).forEach((child: HTMLElement, index) => {
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
+                // TODO: okay, so we should try to pass the item by reference and keep it referring to it's original self
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
                 instance.register(child, scope);
             });
 
-            if (tagName === "SELECT") {
+            if (element.tagName === "SELECT") {
                 directives.some(directive => {
                     if (directive instanceof SdAttr && directive.attribute === "value") {
                         setTimeout(() => directive.run(directive.reference.get()));
@@ -326,15 +329,17 @@ const simpleDirectives: any = {};
                 return;
             }
 
-            const { register, unregister } = this.element.instance;
+            const instance = this.element.instance;
             const { style, children } = this.scope.element;
 
             if (value) {
                 style.display = null;
-                Array.from(children).forEach((child: HTMLElement) => register(child, Object.assign({}, this.scope)));
+                Array.from(children).forEach((child: HTMLElement) =>
+                    instance.register(child, Object.assign({}, this.scope))
+                );
             } else {
                 style.display = "none";
-                Array.from(children).forEach((child: HTMLElement) => unregister(child));
+                Array.from(children).forEach((child: HTMLElement) => instance.unregister(child));
             }
         }
     }
@@ -522,6 +527,10 @@ const simpleDirectives: any = {};
 
         run() {
             const element = this.scope.element as HTMLInputElement;
+            console.log(element.checked, this.updatee.key);
+            console.log(this.updatee.obj);
+            // BUG: dev isn't able to update values on root that are added to scope via sd-for
+            // TODO: pass the scope (the one created in sd-for) by reference and make sure it doesn't lose the ref?
             this.updatee.obj[this.updatee.key] = element.checked;
         }
     }
@@ -796,14 +805,14 @@ const simpleDirectives: any = {};
             }
 
             if (valueChanged || skipDiffCheck) {
-                const { reference, run } = SimpleReference.bubbleUp(this) as Binders;
+                const directive = SimpleReference.bubbleUp(this) as Binders;
 
                 this.value = currentValue;
 
                 try {
-                    run(reference.get());
+                    directive.run(directive.reference.get());
                 } catch (e) {
-                    setTimeout(() => run(reference.get()));
+                    setTimeout(() => directive.run(directive.reference.get()));
                 }
             }
         }
