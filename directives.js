@@ -70,6 +70,17 @@ const simpleDirectives = {};
             Object.assign(this, { instance, scope });
             this.scope.element = element;
             element.setAttribute("sd-registered", "true");
+            directives.sort((a, b) => {
+                if (a.type === "sd-if" && b.type !== "sd-if") {
+                    return 1;
+                }
+                if (a.type === "sd-for" && !is(b.type).in(["sd-if", "sd-for"])) {
+                    return 1;
+                }
+                if (a.type === "on" && b.type !== "on") {
+                    return -1;
+                }
+            });
             directives.forEach(({ type, value }) => {
                 if (is(type).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(value)) {
                     const split = value.split(";");
@@ -209,6 +220,7 @@ const simpleDirectives = {};
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
+                this.handleSdForUniques(child, "sd" + $index);
                 instance.register(child, scope);
             });
             if (element.tagName === "SELECT") {
@@ -219,6 +231,20 @@ const simpleDirectives = {};
                     }
                 });
             }
+        }
+        handleSdForUniques(target, suffix) {
+            const attributes = target.getAttribute("sd-for-unique");
+            if (attributes) {
+                attributes.split(",").forEach(attribute => {
+                    const current = target.getAttribute(attribute);
+                    if (current) {
+                        target.setAttribute(attribute, current + suffix);
+                    } else {
+                        target.setAttribute(attribute, "sdForUnique" + suffix);
+                    }
+                });
+            }
+            Array.from(target.children).forEach(child => this.handleSdForUniques(child, suffix));
         }
     }
     class SdHtml extends SimpleDirective {
@@ -420,7 +446,7 @@ const simpleDirectives = {};
         constructor(directive) {
             super(directive);
             this.directive.element.directives.some(directive => {
-                if (directive instanceof SdHtml && directive.reference instanceof SimplePointer) {
+                if (directive instanceof SdRdo && directive.reference instanceof SimplePointer) {
                     this.updatee = directive.reference;
                     return true;
                 }
@@ -505,16 +531,9 @@ const simpleDirectives = {};
             if (args) {
                 this.args = args.split(":").map(a => SimpleReference.getReference(this, a, true));
             }
-            this.obj = { value: pointer };
-            this.key = "value";
-            let objAndKey = this.maybeGetObjAndKey(this.base, this.scope);
-            if (objAndKey.nah) {
-                objAndKey = this.maybeGetObjAndKey(this.base);
-            }
-            if (!objAndKey.nah) {
-                this.obj = objAndKey.obj;
-                this.key = objAndKey.key;
-            }
+            const { obj, key } = this.getObjAndKey(this.base, this.scope);
+            this.obj = obj;
+            this.key = key;
             if (!isArg) {
                 const bubbledUpParent = SimpleReference.bubbleUp(this);
                 if (bubbledUpParent instanceof SimpleDirective && !(bubbledUpParent instanceof SdOn)) {
@@ -533,12 +552,26 @@ const simpleDirectives = {};
             }
             return this.bang ? !value : value;
         }
-        maybeGetObjAndKey(base, scope) {
+        getObjAndKey(base, scope) {
+            let obj = { value: base };
+            let key = "value";
+            let objAndKey = this.maybeGetObjAndKey(base, scope, false);
+            if (objAndKey.nah) {
+                objAndKey = this.maybeGetObjAndKey(base, scope, true);
+            }
+            if (!objAndKey.nah) {
+                obj = objAndKey.obj;
+                key = objAndKey.key;
+            }
+            return { obj, key };
+        }
+        maybeGetObjAndKey(base, scope, tryWithoutScope) {
             const fallback = { nah: true };
             const hasBrackets = is("[").in(base);
             let hasDots = is(".").in(base);
             let obj;
-            if (scope) {
+            let workingBase = base;
+            if (scope && !tryWithoutScope) {
                 obj = scope;
             } else {
                 let root = SimpleReference.bubbleUp(this);
@@ -556,26 +589,18 @@ const simpleDirectives = {};
                 return obj.hasOwnProperty(base) ? { obj, key: base } : fallback;
             } else {
                 if (hasBrackets) {
-                    let foundPath = true;
-                    while (/\[[^\[\]]*\]/.test(base)) {
-                        base = base.replace(/\[([^\[\]]*)\]/g, (_, capture) => {
-                            const { obj, key } = this.maybeGetObjAndKey(capture, scope);
-                            if (!key) {
-                                foundPath = false;
-                                return "";
-                            }
+                    while (/\[[^\[\]]*\]/.test(workingBase)) {
+                        workingBase = workingBase.replace(/\[([^\[\]]*)\]/g, (_, capture) => {
+                            const { obj, key } = this.getObjAndKey(capture, scope);
                             return "." + obj[key];
                         });
-                    }
-                    if (!foundPath) {
-                        return fallback;
                     }
                     if (!hasDots) {
                         hasDots = true;
                     }
                 }
                 if (hasDots) {
-                    const parts = base.split(".");
+                    const parts = workingBase.split(".");
                     let key;
                     if (obj[parts[0]] && obj[parts[0]].$collection && parts[1] !== "$collection" && parts[1] !== "$index") {
                         const itemRef = obj[parts[0]].$collection[obj[parts[0]].$index];

@@ -103,9 +103,11 @@ Reference Scope:
 -   `element`
 -   `itemName`
 
-The reference should evaluate to an array of objects free of circular references.
+The reference should evaluate to an array of objects.
 
-Elements with the `sd-for` directive should only have one direct child element, but can have multiple grandchildren.
+Optionally have `sd-for` assign unique suffixes to an attribute value each loop with `sd-for-unique`.
+
+`<element attr1="value1" attr2="value2" sd-for-unique="attr1,attr2">`
 
 ## Conditionals
 
