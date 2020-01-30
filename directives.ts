@@ -34,7 +34,7 @@ const simpleDirectives: any = {};
                 let directives: PreDirective[] = Array.from(target.attributes).map(({ name, value }) => {
                     // make sure we don't register a radio group more than once
                     const isNotDupeRdo = name !== "sd-rdo" || SdRdo.isFirstRdoOfGroup(this, target as HTMLInputElement);
-                    
+
                     if (is(name).in(directiveNames) && isNotDupeRdo) {
                         // don't register children; the directives will handle that on their first run
                         if (is(name).in(["sd-if", "sd-for"])) {
@@ -279,7 +279,6 @@ const simpleDirectives: any = {};
             Array.from(children).forEach((child: HTMLElement, index) => {
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
-                // TODO: okay, so we should try to pass the item by reference and keep it referring to it's original self
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
                 instance.register(child, scope);
             });
@@ -535,10 +534,6 @@ const simpleDirectives: any = {};
 
         run() {
             const element = this.scope.element as HTMLInputElement;
-            console.log(element.checked, this.updatee.key);
-            console.log(this.updatee.obj);
-            // BUG: dev isn't able to update values on root that are added to scope via sd-for
-            // TODO: pass the scope (the one created in sd-for) by reference and make sure it doesn't lose the ref?
             this.updatee.obj[this.updatee.key] = element.checked;
         }
     }
@@ -772,6 +767,12 @@ const simpleDirectives: any = {};
                 if (hasDots) {
                     const parts = base.split(".");
                     let key: string | boolean;
+
+                    if (obj[parts[0]] && obj[parts[0]].$collection && parts[1] !== "$collection" && parts[1] !== "$index") {
+                        const itemRef = obj[parts[0]].$collection[obj[parts[0]].$index];
+                        obj = {};
+                        obj[parts[0]] = itemRef;
+                    }
 
                     parts.some((part, index) => {
                         if (index === parts.length - 1) {
