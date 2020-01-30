@@ -332,6 +332,7 @@ const simpleDirectives = {};
                     return new SimpleCaller(this, action);
                 }
             });
+            removeNulls(this.actions);
             this.listener = event => this.actions.forEach(action => action.run(event));
             this.events.forEach(event => this.scope.element.addEventListener(event, this.listener));
         }
@@ -348,8 +349,18 @@ const simpleDirectives = {};
                 }
             } else if (element.hasAttribute("sd-html") && element.isContentEditable) {
                 return new ContentEditableUpdater(this);
-            } else if (element.hasAttribute("sd-rdo")) {
+            } else if (
+                element.tagName === "INPUT" &&
+                element.getAttribute("type") === "radio" &&
+                element.hasAttribute("name") &&
+                (element.hasAttribute("sd-rdo") ||
+                    Array.from(
+                        document.querySelectorAll('input[name="' + element.getAttribute("name") + '"]')
+                    ).some(radio => radio.hasAttribute("sd-rdo")))
+            ) {
                 return new RadioUpdater(this);
+            } else {
+                return null;
             }
         }
     }
@@ -445,11 +456,21 @@ const simpleDirectives = {};
     class RadioUpdater extends SimpleUpdater {
         constructor(directive) {
             super(directive);
-            this.directive.element.directives.some(directive => {
-                if (directive instanceof SdRdo && directive.reference instanceof SimplePointer) {
-                    this.updatee = directive.reference;
-                    return true;
-                }
+            const instance = this.directive.element.instance;
+            // kick this out of the current thread so the SimpleElements will be available
+            setTimeout(() => {
+                const radios = document.querySelectorAll(`input[name=\"${this.scope.element.getAttribute("name")}\"]`);
+                Array.from(radios).some(radio => {
+                    const simpleElements = instance.getSimpleElement(radio);
+                    if (simpleElements.length) {
+                        simpleElements[0].directives.some(directive => {
+                            if (directive instanceof SdRdo && directive.reference instanceof SimplePointer) {
+                                this.updatee = directive.reference;
+                                return true;
+                            }
+                        });
+                    }
+                });
             });
         }
         run() {
@@ -490,6 +511,7 @@ const simpleDirectives = {};
             super(parent);
             const comparator = comparison.match(/([=<!>]{1,3})/)[0];
             const index = comparison.indexOf(comparator);
+            this.comparison = comparison;
             this.comparator = comparator;
             this.left = SimpleReference.getReference(this, comparison.substring(0, index), isArg);
             this.right = SimpleReference.getReference(this, comparison.substring(index + comparator.length), isArg);
