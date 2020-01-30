@@ -9,14 +9,18 @@ const simpleDirectives: any = {};
         value: string;
     }
 
+    // a new instance of this is created when the dev calls simpleDirectives.register()
     class SimpleRegistrar {
         elements: SimpleElement[] = [];
         pointers: SimplePointer[] = [];
         root: object;
 
         constructor(element?: HTMLElement, root?: object) {
+            // default root to window if not provided
             this.root = root ? root : window;
+            // register the provided element, or the body if one was not provided
             this.register(element ? element : document.body);
+            // start the runner
             this.runner();
         }
 
@@ -26,10 +30,13 @@ const simpleDirectives: any = {};
             let skipChildren = false;
 
             if (target.hasAttributes()) {
+                // get any directives that might exist on this element
                 let directives: PreDirective[] = Array.from(target.attributes).map(({ name, value }) => {
+                    // make sure we don't register a radio group more than once
                     const isNotDupeRdo = name !== "sd-rdo" || SdRdo.isFirstRdoOfGroup(this, target as HTMLInputElement);
-
+                    
                     if (is(name).in(directiveNames) && isNotDupeRdo) {
+                        // don't register children; the directives will handle that on their first run
                         if (is(name).in(["sd-if", "sd-for"])) {
                             skipChildren = true;
                         }
@@ -41,6 +48,7 @@ const simpleDirectives: any = {};
                 });
                 removeNulls(directives);
 
+                // only register the element if it has at least one of our directives
                 if (directives.length) {
                     element = new SimpleElement(this, target, directives, Object.assign({}, scope || {}));
                     this.elements.push(element);
@@ -818,13 +826,6 @@ const simpleDirectives: any = {};
         }
     }
 
-    function is(target: any) {
-        return {
-            in: str => str.indexOf(target) !== -1,
-            oneOf: arr => arr.some(item => item === target)
-        };
-    }
-
     function removeNulls(arr: any[]) {
         let index: number;
 
@@ -840,6 +841,8 @@ const simpleDirectives: any = {};
 
         return [firstPart, theRest];
     }
+
+    const is = (thing: any) => ({ in: collection => collection.indexOf(thing) !== -1 });
 
     const directiveClasses = { SdAttr, SdClass, SdFor, SdHtml, SdIf, SdRdo, SdOn };
 
