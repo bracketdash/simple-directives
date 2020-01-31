@@ -1,6 +1,7 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.min.css"><style>body {
     margin: 0;
     padding: 0;
+    font-family: Sans-serif;
 }
 aside {
     height: 100vh;
@@ -138,8 +139,9 @@ aside a:hover {
 <li><code>element</code></li>
 <li><code>itemName</code></li>
 </ul>
-<p>The reference should evaluate to an array of objects free of circular references.</p>
-<p>Elements with the <code>sd-for</code> directive should only have one direct child element, but can have multiple grandchildren.</p>
+<p>The reference should evaluate to an array of objects.</p>
+<p>Optionally have <code>sd-for</code> assign unique suffixes to an attribute value each loop with <code>sd-for-unique</code>.</p>
+<p><code>&lt;element attr1=&quot;value1&quot; attr2=&quot;value2&quot; sd-for-unique=&quot;attr1,attr2&quot;&gt;</code></p>
 <h2 id="conditionals">Conditionals</h2>
 <h3 id="code-if-code-toggles-the-element"><code>if</code> toggles the element</h3>
 <p><code>sd-if=&quot;reference&quot;</code></p>
