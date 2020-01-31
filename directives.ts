@@ -302,7 +302,7 @@ const simpleDirectives: any = {};
             if (element.tagName === "SELECT") {
                 directives.some(directive => {
                     if (directive instanceof SdAttr && directive.attribute === "value") {
-                        setTimeout(() => directive.reference.get((value) => directive.run(value)));
+                        setTimeout(() => directive.reference.get(value => directive.run(value)));
                         return true;
                     }
                 });
@@ -506,7 +506,7 @@ const simpleDirectives: any = {};
             const args = this.callee.args.map((arg: SimplePointer) => {
                 return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
             });
-            
+
             callee.apply(Object.assign({ event: event }, this.scope), args);
         }
 
@@ -544,7 +544,7 @@ const simpleDirectives: any = {};
         }
 
         run() {
-            this.right.get((right) => {
+            this.right.get(right => {
                 this.left.obj[this.left.key] = right;
             });
         }
@@ -707,8 +707,8 @@ const simpleDirectives: any = {};
         }
 
         get(resolve) {
-            this.left.get((left) => {
-                this.right.get((right) => {
+            this.left.get(left => {
+                this.right.get(right => {
                     switch (this.comparator) {
                         case "==":
                             resolve(left == right);
@@ -804,7 +804,7 @@ const simpleDirectives: any = {};
                     value = value.apply(this.scope, args);
                 }
             }
-            
+
             resolve(this.bang ? !value : value);
         }
 
@@ -894,7 +894,7 @@ const simpleDirectives: any = {};
         }
 
         run(skipDiffCheck?: boolean) {
-            this.get((value) => {
+            this.get(value => {
                 let currentValue: any = value;
                 let valueChanged = false;
 
@@ -919,13 +919,13 @@ const simpleDirectives: any = {};
 
                 if (valueChanged || skipDiffCheck) {
                     const directive = SimpleReference.bubbleUp(this) as Binders;
-                    
+
                     this.value = currentValue;
-                    
+
                     try {
-                        directive.reference.get((value) => directive.run(value));
+                        directive.reference.get(value => directive.run(value));
                     } catch (e) {
-                        setTimeout(() => directive.reference.get((value) => directive.run(value)));
+                        setTimeout(() => directive.reference.get(value => directive.run(value)));
                     }
                 }
             });
