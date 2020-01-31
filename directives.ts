@@ -65,7 +65,7 @@ const simpleDirectives: any = {};
         runner() {
             // run each pointer; if the value has changed, it will run the relevant expression
             this.pointers.forEach((pointer: SimplePointer) => pointer.run());
-            setTimeout(() => this.runner(), 200);
+            setTimeout(() => this.runner(), 100);
         }
 
         unregister(target: HTMLElement) {
@@ -78,6 +78,7 @@ const simpleDirectives: any = {};
             removeNulls(this.elements);
         }
 
+        // gives the dev a way to see an element the way the lib sees it
         getSimpleElement(target: HTMLElement) {
             let simpleElements: SimpleElement[] = [];
 
@@ -979,6 +980,30 @@ const simpleDirectives: any = {};
         }
     }
 
+    function memoize(fn: Function, refreshRate: number) {
+        const cache: any = {};
+
+        // traditional function style to ensure we get the right `this`
+        const memoized = function() {
+            const now = Date.now();
+
+            let key: any = Array.from(arguments);
+            key.unshift(this);
+            key = key.map(part => (typeof part === "object" ? JSON.stringify(part) : part.toString())).join("");
+
+            if (!cache.hasOwnProperty(key) || now > cache[key].expires) {
+                cache[key] = {
+                    value: fn.apply(this, arguments),
+                    expires: now + refreshRate
+                };
+            }
+
+            return cache[key].value;
+        };
+
+        return memoized;
+    }
+
     function removeNulls(arr: any[]) {
         let index: number;
 
@@ -1000,4 +1025,6 @@ const simpleDirectives: any = {};
     const directiveClasses = { SdAttr, SdClass, SdFor, SdHtml, SdIf, SdRdo, SdOn };
 
     simpleDirectives.register = (element?: HTMLElement, root?: object) => new SimpleRegistrar(element, root);
+
+    simpleDirectives.memoize = memoize;
 })(simpleDirectives);

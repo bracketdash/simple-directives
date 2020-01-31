@@ -47,7 +47,7 @@ const simpleDirectives = {};
         runner() {
             // run each pointer; if the value has changed, it will run the relevant expression
             this.pointers.forEach(pointer => pointer.run());
-            setTimeout(() => this.runner(), 200);
+            setTimeout(() => this.runner(), 100);
         }
         unregister(target) {
             // unregister each element that is the target or a child of it
@@ -58,6 +58,7 @@ const simpleDirectives = {};
             });
             removeNulls(this.elements);
         }
+        // gives the dev a way to see an element the way the lib sees it
         getSimpleElement(target) {
             let simpleElements = [];
             this.elements.forEach(element => {
@@ -768,6 +769,24 @@ const simpleDirectives = {};
             this.key = key;
         }
     }
+    function memoize(fn, refreshRate) {
+        const cache = {};
+        // traditional function style to ensure we get the right `this`
+        const memoized = function() {
+            const now = Date.now();
+            let key = Array.from(arguments);
+            key.unshift(this);
+            key = key.map(part => (typeof part === "object" ? JSON.stringify(part) : part.toString())).join("");
+            if (!cache.hasOwnProperty(key) || now > cache[key].expires) {
+                cache[key] = {
+                    value: fn.apply(this, arguments),
+                    expires: now + refreshRate
+                };
+            }
+            return cache[key].value;
+        };
+        return memoized;
+    }
     function removeNulls(arr) {
         let index;
         while ((index = arr.indexOf(null)) !== -1) {
@@ -783,4 +802,5 @@ const simpleDirectives = {};
     const is = thing => ({ in: collection => collection.indexOf(thing) !== -1 });
     const directiveClasses = { SdAttr, SdClass, SdFor, SdHtml, SdIf, SdRdo, SdOn };
     simpleDirectives.register = (element, root) => new SimpleRegistrar(element, root);
+    simpleDirectives.memoize = memoize;
 })(simpleDirectives);

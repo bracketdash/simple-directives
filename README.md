@@ -16,12 +16,17 @@ Download: [directives.js](https://raw.githubusercontent.com/bracketdash/simple-d
 
     // if you want to inspect an element how simple-directives sees it
     var simpleElement = app.getSimpleElement(element);
+    
+    // memoizing is recommended for expensive bind functions
+    var myFunction = simpleDirectives.memoize(function() { /* expensive logic */ }, refreshRate);
 </script>
 ```
 
 Directives on `element` and all children will be registered and start working.
 
 `element` and `root` are optional and default to `document.body` and `window`.
+
+`refreshRate` is optinoal on memoized functions and will default to 1000ms.
 
 Notes on vocabulary:
 
