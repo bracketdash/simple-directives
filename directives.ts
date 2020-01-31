@@ -302,7 +302,7 @@ const simpleDirectives: any = {};
             if (element.tagName === "SELECT") {
                 directives.some(directive => {
                     if (directive instanceof SdAttr && directive.attribute === "value") {
-                        setTimeout(() => directive.run(directive.reference.get()));
+                        setTimeout(() => directive.reference.get((value) => directive.run(value)));
                         return true;
                     }
                 });
@@ -492,30 +492,50 @@ const simpleDirectives: any = {};
     }
 
     class SimpleCaller extends SimpleAction {
+        action: string;
         callee: SimplePointer;
 
         constructor(directive: SdOn, action: string) {
             super(directive);
+            this.action = action;
             this.callee = SimpleReference.getReference(this, action) as SimplePointer;
         }
 
-        run(event: Event) {
+        doApply(event: Event) {
             const callee = this.callee.obj[this.callee.key];
-
             const args = this.callee.args.map((arg: SimplePointer) => {
                 return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
             });
-
+            
             callee.apply(Object.assign({ event: event }, this.scope), args);
+        }
+
+        run(event: Event) {
+            // try to fire immediately first
+            if (this.callee.obj && this.callee.obj.hasOwnProperty(this.callee.key)) {
+                this.doApply(event);
+            } else {
+                // if we lost the callee, it may be because the dev is doing something with it on their end
+                // wait until the current stack is done and try once more
+                setTimeout(() => {
+                    this.callee.tryRelink();
+                    if (this.callee.obj && this.callee.obj.hasOwnProperty(this.callee.key)) {
+                        this.doApply(event);
+                    }
+                });
+            }
         }
     }
 
     class SimpleAssigner extends SimpleAction {
+        action: string;
         left: SimplePointer;
         right: SimplePointer | SimpleComparison;
 
         constructor(directive: SdOn, action: string) {
             super(directive);
+
+            this.action = action;
 
             const parts = action.split("=");
 
@@ -524,8 +544,9 @@ const simpleDirectives: any = {};
         }
 
         run() {
-            const right = this.right.get();
-            this.left.obj[this.left.key] = right;
+            this.right.get((right) => {
+                this.left.obj[this.left.key] = right;
+            });
         }
     }
 
@@ -685,28 +706,37 @@ const simpleDirectives: any = {};
             this.right = SimpleReference.getReference(this, comparison.substring(index + comparator.length), isArg);
         }
 
-        get() {
-            const left = this.left.get();
-            const right = this.right.get();
-
-            switch (this.comparator) {
-                case "==":
-                    return left == right;
-                case "===":
-                    return left === right;
-                case "!=":
-                    return left != right;
-                case "!==":
-                    return left != right;
-                case "<":
-                    return left < right;
-                case ">":
-                    return left > right;
-                case "<=":
-                    return left <= right;
-                case ">=":
-                    return left >= right;
-            }
+        get(resolve) {
+            this.left.get((left) => {
+                this.right.get((right) => {
+                    switch (this.comparator) {
+                        case "==":
+                            resolve(left == right);
+                            break;
+                        case "===":
+                            resolve(left === right);
+                            break;
+                        case "!=":
+                            resolve(left != right);
+                            break;
+                        case "!==":
+                            resolve(left != right);
+                            break;
+                        case "<":
+                            resolve(left < right);
+                            break;
+                        case ">":
+                            resolve(left > right);
+                            break;
+                        case "<=":
+                            resolve(left <= right);
+                            break;
+                        case ">=":
+                            resolve(left >= right);
+                            break;
+                    }
+                });
+            });
         }
     }
 
@@ -748,17 +778,34 @@ const simpleDirectives: any = {};
             }
         }
 
-        get() {
+        get(resolve) {
+            let args: SimplePointer[];
             let value: any = this.obj[this.key];
 
             if (typeof value === "function") {
-                const args = this.args.map((arg: SimplePointer) => {
-                    return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
-                });
-                value = value.apply(this.scope, args);
-            }
+                if (this.args.some((arg: SimplePointer) => !arg.obj || !arg.obj.hasOwnProperty(arg.key))) {
+                    // one of the args is undefined; pop execution out into it's own thread
+                    setTimeout(() => {
+                        args = this.args.map((arg: SimplePointer) => {
+                            if (!arg.obj || !arg.obj.hasOwnProperty(arg.key)) {
+                                arg.tryRelink();
+                            }
+                            return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
+                        });
 
-            return this.bang ? !value : value;
+                        value = value.apply(this.scope, args);
+                        resolve(this.bang ? !value : value);
+                    });
+                } else {
+                    args = this.args.map((arg: SimplePointer) => {
+                        return arg.bang ? !arg.obj[arg.key] : arg.obj[arg.key];
+                    });
+
+                    value = value.apply(this.scope, args);
+                }
+            }
+            
+            resolve(this.bang ? !value : value);
         }
 
         getObjAndKey(base: string, scope: object) {
@@ -847,39 +894,47 @@ const simpleDirectives: any = {};
         }
 
         run(skipDiffCheck?: boolean) {
-            let currentValue: any = this.get();
-            let valueChanged = false;
+            this.get((value) => {
+                let currentValue: any = value;
+                let valueChanged = false;
 
-            if (Array.isArray(currentValue) && Array.isArray(this.value)) {
-                if (currentValue.length !== this.value.length) {
+                if (Array.isArray(currentValue) && Array.isArray(this.value)) {
+                    if (currentValue.length !== this.value.length) {
+                        valueChanged = true;
+                    } else {
+                        currentValue.some((obj, index) => {
+                            if (obj !== this.value[index]) {
+                                valueChanged = true;
+                                return true;
+                            }
+                        });
+                    }
+                } else if (currentValue !== this.value) {
                     valueChanged = true;
-                } else {
-                    currentValue.some((obj, index) => {
-                        if (obj !== this.value[index]) {
-                            valueChanged = true;
-                            return true;
-                        }
-                    });
                 }
-            } else if (currentValue !== this.value) {
-                valueChanged = true;
-            }
 
-            if (Array.isArray(currentValue)) {
-                currentValue = currentValue.slice(0);
-            }
-
-            if (valueChanged || skipDiffCheck) {
-                const directive = SimpleReference.bubbleUp(this) as Binders;
-
-                this.value = currentValue;
-
-                try {
-                    directive.run(directive.reference.get());
-                } catch (e) {
-                    setTimeout(() => directive.run(directive.reference.get()));
+                if (Array.isArray(currentValue)) {
+                    currentValue = currentValue.slice(0);
                 }
-            }
+
+                if (valueChanged || skipDiffCheck) {
+                    const directive = SimpleReference.bubbleUp(this) as Binders;
+                    
+                    this.value = currentValue;
+                    
+                    try {
+                        directive.reference.get((value) => directive.run(value));
+                    } catch (e) {
+                        setTimeout(() => directive.reference.get((value) => directive.run(value)));
+                    }
+                }
+            });
+        }
+
+        tryRelink() {
+            const { obj, key } = this.getObjAndKey(this.base, this.scope);
+            this.obj = obj;
+            this.key = key;
         }
     }
 
