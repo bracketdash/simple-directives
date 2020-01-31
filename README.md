@@ -26,7 +26,7 @@ Directives on `element` and all children will be registered and start working.
 
 `element` and `root` are optional and default to `document.body` and `window`.
 
-`refreshRate` is optinoal on memoized functions and will default to 1000ms.
+`refreshRate` is optional on memoized functions and will default to 1000ms.
 
 Notes on vocabulary:
 
