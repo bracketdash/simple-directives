@@ -132,17 +132,33 @@ const simpleDirectives: any = {};
             });
 
             // sd-if (highest in dom) > sd-for (highest in dom) >  sd-if (next highest) > ... > (others)
-            this.instance.pointers.sort((a, b) => {
-                // TODO: do the "highest in the dom first" parts for sd-if and sd-for
-                const directiveA = (SimpleReference.bubbleUp(a) as SimpleDirective).constructor.toString().split(" ")[1];
-                const directiveB = (SimpleReference.bubbleUp(b) as SimpleDirective).constructor.toString().split(" ")[1];
-
-                if (directiveA === "SdIf" && directiveB !== "SdIf") {
+            this.instance.pointers.sort((pointerA, pointerB) => {
+                
+                // TODO: this is firing throughout registrating multiple times but only needs to fire once, at the end of registration
+                
+                const a: any = {
+                    dir: (SimpleReference.bubbleUp(pointerA) as SimpleDirective).constructor.toString().split(" ")[1],
+                    el: pointerA.scope.element
+                };
+                const b: any = {
+                    dir: (SimpleReference.bubbleUp(pointerB) as SimpleDirective).constructor.toString().split(" ")[1],
+                    el: pointerB.scope.element
+                };
+                
+                if (a.el === b.el) {
+                    a.dir = (SimpleReference.bubbleUp(pointerA) as SimpleDirective).constructor.toString().split(" ")[1];
+                    b.dir = (SimpleReference.bubbleUp(pointerB) as SimpleDirective).constructor.toString().split(" ")[1];
+                    if (a.dir === "SdIf" && b.dir !== "SdIf") {
+                        return -1;
+                    } else if (a.dir === "SdFor" && !is(b.dir).in(["SdIf", "SdFor"])) {
+                        return -1;
+                    }
+                } else if (a.el.contains(b.el)) {
                     return -1;
+                } else if (b.el.contains(a.el)) {
+                    return 1;
                 }
-                if (directiveA === "SdFor" && !is(directiveB).in(["SdIf", "SdFor"])) {
-                    return -1;
-                }
+                
                 return 0;
             });
         }
