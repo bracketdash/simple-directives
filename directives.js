@@ -38,15 +38,19 @@ const simpleDirectives = {};
                     this.elements.push(element);
                 }
             }
+            // if this element didn't have directives or it had an sd-for or sd-if...
             if (!element || !skipChildren) {
+                // register each child element
                 Array.from(target.children).forEach(child => this.register(child, scope));
             }
         }
         runner() {
+            // run each pointer; if the value has changed, it will run the relevant expression
             this.pointers.forEach(pointer => pointer.run());
             setTimeout(() => this.runner(), 200);
         }
         unregister(target) {
+            // unregister each element that is the target or a child of it
             this.elements = this.elements.map(element => {
                 return element.scope.element === target || target.contains(element.scope.element)
                     ? element.unregister()
@@ -69,7 +73,10 @@ const simpleDirectives = {};
             this.directives = [];
             Object.assign(this, { instance, scope });
             this.scope.element = element;
+            // not used for anything; just makes it clear at a glance whether an element is registered
             element.setAttribute("sd-registered", "true");
+            // make sure the order is sd-if > sd-for > (all the others) > sd-on
+            // this execution order is important!
             directives.sort((a, b) => {
                 if (a.type === "sd-if" && b.type !== "sd-if") {
                     return 1;
@@ -81,6 +88,7 @@ const simpleDirectives = {};
                     return -1;
                 }
             });
+            // register each directive on the element
             directives.forEach(({ type, value }) => {
                 if (is(type).in(["sd-attr", "sd-class", "sd-on"]) && is(";").in(value)) {
                     const split = value.split(";");
@@ -92,6 +100,7 @@ const simpleDirectives = {};
         }
         unregister() {
             this.scope.element.removeAttribute("sd-registered");
+            // remove directives from the element
             this.directives.forEach(directive => {
                 if (directive instanceof SdOn) {
                     directive.destroy();
@@ -100,6 +109,7 @@ const simpleDirectives = {};
                     this.scope.element.innerHTML = directive.originalHTML;
                 }
             });
+            // remove pointers from the registry
             this.instance.pointers = this.instance.pointers.map(pointer => {
                 const parent = SimpleReference.bubbleUp(pointer);
                 return parent.element === this ? null : pointer;
@@ -108,6 +118,7 @@ const simpleDirectives = {};
             return null;
         }
     }
+    // not used directly; extensions below
     class SimpleDirective {
         constructor(element, expression) {
             Object.assign(this, { element, expression, scope: element.scope });
@@ -129,6 +140,7 @@ const simpleDirectives = {};
             const attribute = this.attribute;
             const element = this.scope.element;
             if (attribute === "value" && element.tagName === "SELECT") {
+                // make sure the appropriate option is selected
                 Array.from(element.getElementsByTagName("option")).forEach(optionElement => {
                     if ((Array.isArray(value) && is(optionElement.value).in(value)) || value == optionElement.value) {
                         optionElement.selected = true;
@@ -141,11 +153,13 @@ const simpleDirectives = {};
                     element.removeAttribute(attribute);
                 }
                 if (attribute === "value") {
+                    // browsers don't officially bind the attribute and property
                     element.value = "";
                 }
             } else {
                 element.setAttribute(attribute, value);
                 if (attribute === "value") {
+                    // browsers don't officially bind the attribute and property
                     element.value = value;
                 }
             }
@@ -161,6 +175,7 @@ const simpleDirectives = {};
             this.reference = SimpleReference.getReference(this, reference);
         }
         run(value) {
+            // prevent unnecessary refires for boolean directives (sd-if and sd-class)
             if (this.cachedState === 2) {
                 this.cachedState = value ? 1 : 0;
             } else if (value && this.cachedState === 0) {
@@ -171,6 +186,7 @@ const simpleDirectives = {};
                 return;
             }
             const classList = this.scope.element.classList;
+            // appropriately toggle class
             this.classes.forEach(className => {
                 if (!value) {
                     if (classList.contains(className)) {
@@ -201,11 +217,14 @@ const simpleDirectives = {};
             const { instance, directives } = this.element;
             const element = this.scope.element;
             const children = this.scope.element.children;
+            // create an orphan element so we can use it to apply only the necessary differences
             const orphan = document.createElement("div");
             orphan.innerHTML = this.originalHTML.repeat($collection.length);
+            // unregister all the current children
             Array.from(children).forEach(child => {
                 instance.unregister(child);
             });
+            // make the dom changes
             if (children.length > orphan.children.length) {
                 Array.from(Array(children.length - orphan.children.length)).forEach(() => {
                     element.removeChild(element.lastChild);
@@ -216,6 +235,7 @@ const simpleDirectives = {};
                     element.appendChild(child);
                 });
             }
+            // register all the new children
             Array.from(children).forEach((child, index) => {
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
@@ -223,6 +243,7 @@ const simpleDirectives = {};
                 this.handleSdForUniques(child, "sd" + $index);
                 instance.register(child, scope);
             });
+            // if this is a select, we may need to refresh it to show an accurate value
             if (element.tagName === "SELECT") {
                 directives.some(directive => {
                     if (directive instanceof SdAttr && directive.attribute === "value") {
@@ -235,6 +256,7 @@ const simpleDirectives = {};
         handleSdForUniques(target, suffix) {
             const attributes = target.getAttribute("sd-for-unique");
             if (attributes) {
+                // add a unique suffix per loop for each given attribute
                 attributes.split(",").forEach(attribute => {
                     const current = target.getAttribute(attribute);
                     if (current) {
@@ -244,6 +266,7 @@ const simpleDirectives = {};
                     }
                 });
             }
+            // crawl through all children
             Array.from(target.children).forEach(child => this.handleSdForUniques(child, suffix));
         }
     }
@@ -255,8 +278,11 @@ const simpleDirectives = {};
         run(value) {
             const instance = this.element.instance;
             const element = this.scope.element;
+            // unregister any current children
             Array.from(element.children).forEach(child => instance.unregister(child));
+            // switch out the markup
             element.innerHTML = value;
+            // register any new children
             Array.from(element.children).forEach(child => instance.register(child, this.scope));
         }
     }
@@ -267,6 +293,7 @@ const simpleDirectives = {};
             this.reference = SimpleReference.getReference(this, expression);
         }
         run(value) {
+            // prevent unnecessary refires for boolean directives (sd-if and sd-class)
             if (this.cachedState === 2) {
                 this.cachedState = value ? 1 : 0;
             } else if (value && this.cachedState === 0) {
@@ -279,10 +306,13 @@ const simpleDirectives = {};
             const instance = this.element.instance;
             const { style, children } = this.scope.element;
             if (value) {
+                // go back to the original display rule if there was one
                 style.display = null;
+                // register children (they weren't registered when the if was falsy)
                 Array.from(children).forEach(child => instance.register(child, Object.assign({}, this.scope)));
             } else {
                 style.display = "none";
+                // unregister any chidren
                 Array.from(children).forEach(child => instance.unregister(child));
             }
         }
@@ -295,6 +325,8 @@ const simpleDirectives = {};
         run(value) {
             const groupName = this.scope.element.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
+            // find the radio with the matching value and select it
+            // while we're at it, deselect everything else
             radioInputs.forEach(radioInput => {
                 if (radioInput.value === value) {
                     radioInput.checked = true;
@@ -304,17 +336,12 @@ const simpleDirectives = {};
             });
         }
         static isFirstRdoOfGroup(instance, target) {
-            let isFirst = true;
-            instance.elements.some(({ scope }) => {
-                if (
+            return !instance.elements.some(
+                ({ scope }) =>
                     scope.element.tagName === "INPUT" &&
                     scope.element.getAttribute("type") === "radio" &&
                     scope.element.getAttribute("name") === target.getAttribute("name")
-                ) {
-                    isFirst = false;
-                }
-            });
-            return isFirst;
+            );
         }
     }
     class SdOn extends SimpleDirective {
@@ -323,8 +350,10 @@ const simpleDirectives = {};
             const [events, actions] = splitFirstPart(expression);
             this.events = events.split(",");
             this.scope.eventNames = this.events;
+            // make sure we're assigning the right action types
             this.actions = actions.split(",").map(action => {
                 if (action === "$update") {
+                    // if we can't get one, this will return null and we'll remove it...
                     return this.getUpdater();
                 } else if (is("=").in(action)) {
                     return new SimpleAssigner(this, action);
@@ -332,6 +361,7 @@ const simpleDirectives = {};
                     return new SimpleCaller(this, action);
                 }
             });
+            // ...here.
             removeNulls(this.actions);
             this.listener = event => this.actions.forEach(action => action.run(event));
             this.events.forEach(event => this.scope.element.addEventListener(event, this.listener));
@@ -341,6 +371,7 @@ const simpleDirectives = {};
         }
         getUpdater() {
             const element = this.scope.element;
+            // run-of-the-mill logic to get the appropriate updater
             if (element.hasAttribute("sd-attr")) {
                 if (element.tagName === "INPUT" && is(element.getAttribute("type")).in(["checkbox", "radio"])) {
                     return new CheckedUpdater(this);
@@ -364,6 +395,7 @@ const simpleDirectives = {};
             }
         }
     }
+    // not used directly; extensions below
     class SimpleAction {
         constructor(directive) {
             this.directive = directive;
@@ -417,6 +449,7 @@ const simpleDirectives = {};
     class ValueUpdater extends SimpleUpdater {
         constructor(directive) {
             super(directive);
+            // find the reference to the value we'd like to update
             this.directive.element.directives.some(directive => {
                 if (
                     directive instanceof SdAttr &&
@@ -430,6 +463,7 @@ const simpleDirectives = {};
         }
         run() {
             const value = this.scope.element.value;
+            // try to pass the developer a real number if that seems to be what they want
             if (typeof this.updatee.obj[this.updatee.key] === "number" && !isNaN(Number(value))) {
                 this.updatee.obj[this.updatee.key] = Number(value);
             } else {
@@ -440,6 +474,7 @@ const simpleDirectives = {};
     class CheckedUpdater extends SimpleUpdater {
         constructor(directive) {
             super(directive);
+            // find the reference to the value we'd like to update
             this.directive.element.directives.some(directive => {
                 if (
                     directive instanceof SdAttr &&
@@ -459,6 +494,7 @@ const simpleDirectives = {};
     class ContentEditableUpdater extends SimpleUpdater {
         constructor(directive) {
             super(directive);
+            // find the reference to the value we'd like to update
             this.directive.element.directives.some(directive => {
                 if (directive instanceof SdHtml && directive.reference instanceof SimplePointer) {
                     this.updatee = directive.reference;
@@ -478,6 +514,7 @@ const simpleDirectives = {};
             // kick this out of the current thread so the SimpleElements will be available
             setTimeout(() => {
                 const radios = document.querySelectorAll(`input[name=\"${this.scope.element.getAttribute("name")}\"]`);
+                // find the reference to the value we'd like to update
                 Array.from(radios).some(radio => {
                     const simpleElements = instance.getSimpleElement(radio);
                     if (simpleElements.length) {
@@ -495,6 +532,7 @@ const simpleDirectives = {};
             const groupName = this.scope.element.getAttribute("name");
             const radioInputs = Array.from(document.getElementsByName(groupName));
             let value;
+            // get dat value
             radioInputs.some(radioInput => {
                 if (radioInput.checked) {
                     value = radioInput.value;
@@ -509,6 +547,7 @@ const simpleDirectives = {};
             this.parent = parent;
             this.scope = parent.scope;
         }
+        // not the best name.."bubbles up" to return the earliest ancestor
         static bubbleUp(reference) {
             let parent = reference;
             while (parent instanceof SimpleReference) {
@@ -654,12 +693,14 @@ const simpleDirectives = {};
                 return obj.hasOwnProperty(base) ? { obj, key: base } : fallback;
             } else {
                 if (hasBrackets) {
+                    // go through and convert all the bracket references to a single dots-only reference
                     while (/\[[^\[\]]*\]/.test(workingBase)) {
                         workingBase = workingBase.replace(/\[([^\[\]]*)\]/g, (_, capture) => {
                             const { obj, key } = this.getObjAndKey(capture, scope);
                             return "." + obj[key];
                         });
                     }
+                    // if there were brackets but no dots..there are now dots
                     if (!hasDots) {
                         hasDots = true;
                     }
@@ -672,6 +713,7 @@ const simpleDirectives = {};
                         obj = {};
                         obj[parts[0]] = itemRef;
                     }
+                    // build up the final obj state one leaf at a time
                     parts.some((part, index) => {
                         if (index === parts.length - 1) {
                             key = part;
@@ -690,6 +732,7 @@ const simpleDirectives = {};
             this.get(value => {
                 let currentValue = value;
                 let valueChanged = false;
+                // if we're dealing in arrays, let's compare them differently
                 if (Array.isArray(currentValue) && Array.isArray(this.value)) {
                     if (currentValue.length !== this.value.length) {
                         valueChanged = true;
@@ -710,6 +753,7 @@ const simpleDirectives = {};
                 if (valueChanged || skipDiffCheck) {
                     const directive = SimpleReference.bubbleUp(this);
                     this.value = currentValue;
+                    // in some cases, the reference isn't yet defined at this point
                     try {
                         directive.reference.get(value => directive.run(value));
                     } catch (e) {
