@@ -46,7 +46,11 @@ const simpleDirectives = {};
         }
         runner() {
             // run each pointer; if the value has changed, it will run the relevant expression
-            this.pointers.forEach(pointer => pointer.run());
+            this.pointers.forEach(pointer => {
+                if (pointer.valid) {
+                    pointer.run();
+                }
+            });
             setTimeout(() => this.runner(), 100);
         }
         unregister(target) {
@@ -76,8 +80,7 @@ const simpleDirectives = {};
             this.scope.element = element;
             // not used for anything; just makes it clear at a glance whether an element is registered
             element.setAttribute("sd-registered", "true");
-            // make sure the order is sd-if > sd-for > (all the others) > sd-on
-            // this execution order is important!
+            // order is important: sd-if > sd-for > (others) > sd-on
             directives.sort((a, b) => {
                 if (a.type === "sd-if" && b.type !== "sd-if") {
                     return 1;
@@ -98,6 +101,23 @@ const simpleDirectives = {};
                     this.directives.push(SimpleDirective.getDirective(this, type, value));
                 }
             });
+            // sd-if (highest in dom) > sd-for (highest in dom) >  sd-if (next highest) > ... > (others)
+            this.instance.pointers.sort((a, b) => {
+                // TODO: do the "highest in the dom first" parts for sd-if and sd-for
+                const directiveA = SimpleReference.bubbleUp(a)
+                    .constructor.toString()
+                    .split(" ")[1];
+                const directiveB = SimpleReference.bubbleUp(b)
+                    .constructor.toString()
+                    .split(" ")[1];
+                if (directiveA === "SdIf" && directiveB !== "SdIf") {
+                    return -1;
+                }
+                if (directiveA === "SdFor" && !is(directiveB).in(["SdIf", "SdFor"])) {
+                    return -1;
+                }
+                return 0;
+            });
         }
         unregister() {
             this.scope.element.removeAttribute("sd-registered");
@@ -113,7 +133,12 @@ const simpleDirectives = {};
             // remove pointers from the registry
             this.instance.pointers = this.instance.pointers.map(pointer => {
                 const parent = SimpleReference.bubbleUp(pointer);
-                return parent.element === this ? null : pointer;
+                if (parent.element === this) {
+                    pointer.valid = false;
+                    return null;
+                } else {
+                    return pointer;
+                }
             });
             removeNulls(this.instance.pointers);
             return null;
@@ -354,7 +379,7 @@ const simpleDirectives = {};
             // make sure we're assigning the right action types
             this.actions = actions.split(",").map(action => {
                 if (action === "$update") {
-                    // if we can't get one, this will return null and we'll remove it...
+                    // if we can't get one, this will return null and we'll remove it
                     return this.getUpdater();
                 } else if (is("=").in(action)) {
                     return new SimpleAssigner(this, action);
@@ -362,7 +387,6 @@ const simpleDirectives = {};
                     return new SimpleCaller(this, action);
                 }
             });
-            // ...here.
             removeNulls(this.actions);
             this.listener = event => this.actions.forEach(action => action.run(event));
             this.events.forEach(event => this.scope.element.addEventListener(event, this.listener));
@@ -612,6 +636,7 @@ const simpleDirectives = {};
             super(parent);
             this.args = [];
             this.bang = false;
+            this.valid = true;
             if (pointer.startsWith("!")) {
                 this.bang = true;
                 pointer = pointer.substring(1);
@@ -637,7 +662,7 @@ const simpleDirectives = {};
             let value = this.obj[this.key];
             if (typeof value === "function") {
                 if (this.args.some(arg => !arg.obj || !arg.obj.hasOwnProperty(arg.key))) {
-                    // one of the args is undefined; pop execution out into it's own thread
+                    // one of the args is undefined; let's try again after the current stack finishes
                     setTimeout(() => {
                         args = this.args.map(arg => {
                             if (!arg.obj || !arg.obj.hasOwnProperty(arg.key)) {
@@ -745,6 +770,14 @@ const simpleDirectives = {};
                             }
                         });
                     }
+                } else if (
+                    typeof currentValue !== "undefined" &&
+                    currentValue.toString &&
+                    currentValue.toString() === "NaN"
+                ) {
+                    if (this.value && this.value.toString && this.value.toString() === "NaN") {
+                        valueChanged = true;
+                    }
                 } else if (currentValue !== this.value) {
                     valueChanged = true;
                 }
@@ -776,11 +809,30 @@ const simpleDirectives = {};
             const now = Date.now();
             let key = Array.from(arguments);
             key.unshift(this);
-            key = key.map(part => (typeof part === "object" ? JSON.stringify(part) : part.toString())).join("");
+            key = key
+                .map(part => {
+                    switch (typeof part) {
+                        case "object":
+                            if (part === null) {
+                                return "null";
+                            } else {
+                                return JSON.stringify(part);
+                            }
+                        case "boolean":
+                        case "number":
+                        case "function":
+                            return part.toString();
+                        case "string":
+                            return part;
+                        default:
+                            return typeof part;
+                    }
+                })
+                .join("");
             if (!cache.hasOwnProperty(key) || now > cache[key].expires) {
                 cache[key] = {
                     value: fn.apply(this, arguments),
-                    expires: now + refreshRate
+                    expires: now + (refreshRate || 1000)
                 };
             }
             return cache[key].value;
