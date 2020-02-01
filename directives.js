@@ -5,6 +5,7 @@ const simpleDirectives = {};
         constructor(element, root) {
             this.elements = [];
             this.pointers = [];
+            this.trackers = [];
             // default root to window if not provided
             this.root = root ? root : window;
             // register the provided element, or the body if one was not provided
@@ -12,10 +13,14 @@ const simpleDirectives = {};
             // start the runner
             this.runner();
         }
-        register(target, scope) {
+        register(target, scope, tracker) {
             const directiveNames = Object.keys(directiveClasses).map(k => k.replace("d", "d-").toLowerCase());
             let element;
             let skipChildren = false;
+            let trackerId = tracker ? tracker : "t" + Math.floor(Math.random() * 100000);
+            if (!document.body.contains(target)) {
+                throw new Error("Attempted to register an element that is not within the DOM.");
+            }
             if (target.hasAttributes()) {
                 // get any directives that might exist on this element
                 let directives = Array.from(target.attributes).map(({ name, value }) => {
@@ -38,10 +43,54 @@ const simpleDirectives = {};
                     this.elements.push(element);
                 }
             }
-            // if this element didn't have directives or it had an sd-for or sd-if...
-            if (!element || !skipChildren) {
+            if (!this.trackers.hasOwnProperty(trackerId)) {
+                // start a tracker for this registration cascade
+                this.trackers[trackerId] = 0;
+            } else {
+                // if we have one already, subtract a tick
+                this.trackers[trackerId] = this.trackers[trackerId] - 1;
+            }
+            if (target.children.length && (!element || !skipChildren)) {
+                // add to the counter so we don't fire the sorter too early
+                this.trackers[trackerId] = this.trackers[trackerId] + target.children.length;
                 // register each child element
-                Array.from(target.children).forEach(child => this.register(child, scope));
+                Array.from(target.children).forEach(child => this.register(child, scope, trackerId));
+            } else if (this.trackers[trackerId] === 0) {
+                // when this counter reaches 0, we know we are done with registration
+                delete this.trackers[trackerId];
+                // sd-if (highest in dom) > sd-for (highest in dom) >  sd-if (next highest) > ... > (others)
+                this.pointers.sort((pointerA, pointerB) => {
+                    const a = {
+                        dir: SimpleReference.bubbleUp(pointerA)
+                            .constructor.toString()
+                            .split(" ")[1],
+                        el: pointerA.scope.element
+                    };
+                    const b = {
+                        dir: SimpleReference.bubbleUp(pointerB)
+                            .constructor.toString()
+                            .split(" ")[1],
+                        el: pointerB.scope.element
+                    };
+                    if (a.el === b.el) {
+                        a.dir = SimpleReference.bubbleUp(pointerA)
+                            .constructor.toString()
+                            .split(" ")[1];
+                        b.dir = SimpleReference.bubbleUp(pointerB)
+                            .constructor.toString()
+                            .split(" ")[1];
+                        if (a.dir === "SdIf" && b.dir !== "SdIf") {
+                            return -1;
+                        } else if (a.dir === "SdFor" && !is(b.dir).in(["SdIf", "SdFor"])) {
+                            return -1;
+                        }
+                    } else if (a.el.contains(b.el)) {
+                        return -1;
+                    } else if (b.el.contains(a.el)) {
+                        return 1;
+                    }
+                    return 0;
+                });
             }
         }
         runner() {
@@ -56,6 +105,25 @@ const simpleDirectives = {};
         unregister(target) {
             // unregister each element that is the target or a child of it
             this.elements = this.elements.map(element => {
+                // TODO: debug then remove this block
+                if (
+                    target.parentElement.getAttribute("sd-if") === "isSectionTypeActive:FiftyFifty" &&
+                    element.scope.element.getAttribute("sd-if") === "fiftyFifty.shouldShowContentBlockImageUpload"
+                ) {
+                    // BUG: a directive will sometimes fire past the point at which it should have been unregistered
+                    // Observations:
+                    // everything seems to be going well until this point, when we try to unregister the element causing the problem (element.scope.element in this block)
+                    // the element in the DOM is not always the same as the element we assigned to scope.element, so .contains() doesn't always work as our check
+                    // but wait...the elements are unregistered before being registered fresh in SdFor and SdHtml, at which point the scope.element would be the element currently in the DOM
+                    // ok this is strange -- it says it's not a child of the target but IS a child of the body a couple times before it says it's not a child of either...
+                    // What are the possible causes?
+                    // The element that's referenced in the SimpleElement is being replaced in the DOM at some point
+                    // The reference to the element in the SimpleElement is being overwritten at some point
+                    // What we need to find out:
+                    // Which one of the above is happening and at what point it's happening
+                    console.log("body contains?", document.body.contains(element.scope.element));
+                    console.log("target contains?", target.contains(element.scope.element));
+                }
                 return element.scope.element === target || target.contains(element.scope.element)
                     ? element.unregister()
                     : element;
@@ -100,23 +168,6 @@ const simpleDirectives = {};
                 } else {
                     this.directives.push(SimpleDirective.getDirective(this, type, value));
                 }
-            });
-            // sd-if (highest in dom) > sd-for (highest in dom) >  sd-if (next highest) > ... > (others)
-            this.instance.pointers.sort((a, b) => {
-                // TODO: do the "highest in the dom first" parts for sd-if and sd-for
-                const directiveA = SimpleReference.bubbleUp(a)
-                    .constructor.toString()
-                    .split(" ")[1];
-                const directiveB = SimpleReference.bubbleUp(b)
-                    .constructor.toString()
-                    .split(" ")[1];
-                if (directiveA === "SdIf" && directiveB !== "SdIf") {
-                    return -1;
-                }
-                if (directiveA === "SdFor" && !is(directiveB).in(["SdIf", "SdFor"])) {
-                    return -1;
-                }
-                return 0;
             });
         }
         unregister() {
@@ -261,8 +312,8 @@ const simpleDirectives = {};
                     element.appendChild(child);
                 });
             }
-            // register all the new children
-            Array.from(children).forEach((child, index) => {
+            // register all the new children (reference element.children to grab the new ones)
+            Array.from(element.children).forEach((child, index) => {
                 const $index = Math.floor(index / this.originalChildren);
                 const scope = Object.assign({}, this.scope);
                 scope[this.alias] = Object.assign({ $collection, $index }, $collection[$index]);
