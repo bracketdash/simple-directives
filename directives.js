@@ -105,25 +105,6 @@ const simpleDirectives = {};
         unregister(target) {
             // unregister each element that is the target or a child of it
             this.elements = this.elements.map(element => {
-                // TODO: debug then remove this block
-                if (
-                    target.parentElement.getAttribute("sd-if") === "isSectionTypeActive:FiftyFifty" &&
-                    element.scope.element.getAttribute("sd-if") === "fiftyFifty.shouldShowContentBlockImageUpload"
-                ) {
-                    // BUG: a directive will sometimes fire past the point at which it should have been unregistered
-                    // Observations:
-                    // everything seems to be going well until this point, when we try to unregister the element causing the problem (element.scope.element in this block)
-                    // the element in the DOM is not always the same as the element we assigned to scope.element, so .contains() doesn't always work as our check
-                    // but wait...the elements are unregistered before being registered fresh in SdFor and SdHtml, at which point the scope.element would be the element currently in the DOM
-                    // ok this is strange -- it says it's not a child of the target but IS a child of the body a couple times before it says it's not a child of either...
-                    // What are the possible causes?
-                    // The element that's referenced in the SimpleElement is being replaced in the DOM at some point
-                    // The reference to the element in the SimpleElement is being overwritten at some point
-                    // What we need to find out:
-                    // Which one of the above is happening and at what point it's happening
-                    console.log("body contains?", document.body.contains(element.scope.element));
-                    console.log("target contains?", target.contains(element.scope.element));
-                }
                 return element.scope.element === target || target.contains(element.scope.element)
                     ? element.unregister()
                     : element;
@@ -178,7 +159,9 @@ const simpleDirectives = {};
                     directive.destroy();
                 }
                 if (directive instanceof SdFor) {
-                    this.scope.element.innerHTML = directive.originalHTML;
+                    setTimeout(() => {
+                        this.scope.element.innerHTML = directive.originalHTML;
+                    });
                 }
             });
             // remove pointers from the registry

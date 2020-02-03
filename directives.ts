@@ -34,7 +34,7 @@ const simpleDirectives: any = {};
             if (!document.body.contains(target)) {
                 throw new Error("Attempted to register an element that is not within the DOM.");
             }
-            
+
             if (target.hasAttributes()) {
                 // get any directives that might exist on this element
                 let directives: PreDirective[] = Array.from(target.attributes).map(({ name, value }) => {
@@ -60,7 +60,7 @@ const simpleDirectives: any = {};
                     this.elements.push(element);
                 }
             }
-            
+
             if (!this.trackers.hasOwnProperty(trackerId)) {
                 // start a tracker for this registration cascade
                 this.trackers[trackerId] = 0;
@@ -72,13 +72,13 @@ const simpleDirectives: any = {};
             if (target.children.length && (!element || !skipChildren)) {
                 // add to the counter so we don't fire the sorter too early
                 this.trackers[trackerId] = this.trackers[trackerId] + target.children.length;
-                
+
                 // register each child element
                 Array.from(target.children).forEach((child: HTMLElement) => this.register(child, scope, trackerId));
             } else if (this.trackers[trackerId] === 0) {
                 // when this counter reaches 0, we know we are done with registration
                 delete this.trackers[trackerId];
-                
+
                 // sd-if (highest in dom) > sd-for (highest in dom) >  sd-if (next highest) > ... > (others)
                 this.pointers.sort((pointerA, pointerB) => {
                     const a: any = {
@@ -89,10 +89,14 @@ const simpleDirectives: any = {};
                         dir: (SimpleReference.bubbleUp(pointerB) as SimpleDirective).constructor.toString().split(" ")[1],
                         el: pointerB.scope.element
                     };
-                    
+
                     if (a.el === b.el) {
-                        a.dir = (SimpleReference.bubbleUp(pointerA) as SimpleDirective).constructor.toString().split(" ")[1];
-                        b.dir = (SimpleReference.bubbleUp(pointerB) as SimpleDirective).constructor.toString().split(" ")[1];
+                        a.dir = (SimpleReference.bubbleUp(pointerA) as SimpleDirective).constructor
+                            .toString()
+                            .split(" ")[1];
+                        b.dir = (SimpleReference.bubbleUp(pointerB) as SimpleDirective).constructor
+                            .toString()
+                            .split(" ")[1];
                         if (a.dir === "SdIf" && b.dir !== "SdIf") {
                             return -1;
                         } else if (a.dir === "SdFor" && !is(b.dir).in(["SdIf", "SdFor"])) {
@@ -103,7 +107,7 @@ const simpleDirectives: any = {};
                     } else if (b.el.contains(a.el)) {
                         return 1;
                     }
-                    
+
                     return 0;
                 });
             }
@@ -122,31 +126,6 @@ const simpleDirectives: any = {};
         unregister(target: HTMLElement) {
             // unregister each element that is the target or a child of it
             this.elements = this.elements.map(element => {
-                
-                // TODO: debug then remove this block
-                if (
-                    target.parentElement.getAttribute("sd-if") === "isSectionTypeActive:FiftyFifty" &&
-                    element.scope.element.getAttribute("sd-if") === "fiftyFifty.shouldShowContentBlockImageUpload"
-                ) {
-                    // BUG: a directive will sometimes fire past the point at which it should have been unregistered
-                    
-                    // Observations:
-                    // everything seems to be going well until this point, when we try to unregister the element causing the problem (element.scope.element in this block)
-                    // the element in the DOM is not always the same as the element we assigned to scope.element, so .contains() doesn't always work as our check
-                    // but wait...the elements are unregistered before being registered fresh in SdFor and SdHtml, at which point the scope.element would be the element currently in the DOM
-                    // ok this is strange -- it says it's not a child of the target but IS a child of the body a couple times before it says it's not a child of either...
-                    
-                    // What are the possible causes?
-                    // The element that's referenced in the SimpleElement is being replaced in the DOM at some point
-                    // The reference to the element in the SimpleElement is being overwritten at some point
-                    
-                    // What we need to find out:
-                    // Which one of the above is happening and at what point it's happening
-                    
-                    console.log("body contains?", document.body.contains(element.scope.element));
-                    console.log("target contains?", target.contains(element.scope.element));
-                }
-                
                 return element.scope.element === target || target.contains(element.scope.element)
                     ? element.unregister()
                     : element;
@@ -213,7 +192,9 @@ const simpleDirectives: any = {};
                     directive.destroy();
                 }
                 if (directive instanceof SdFor) {
-                    this.scope.element.innerHTML = directive.originalHTML;
+                    setTimeout(() => {
+                        this.scope.element.innerHTML = directive.originalHTML;
+                    });
                 }
             });
 
