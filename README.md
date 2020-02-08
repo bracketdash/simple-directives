@@ -6,27 +6,27 @@ Download: [directives.js](https://raw.githubusercontent.com/bracketdash/simple-d
 <!-- basic syntax -->
 <element sd-directive="expression" />
 
-<!-- multiple expressions are allowed on `sd-attr`, `sd-class`, and `sd-on` -->
+<!-- `sd-attr`, `sd-class` and `sd-on` accept multiple expressions -->
 <element sd-class="class:reference;class:reference;..." />
-
-<script src="directives.min.js"></script>
-<script>
-    // place where you want, but after the dom has finished loading
-    var app = simpleDirectives.register(element, root);
-
-    // if you want to inspect an element how simple-directives sees it
-    var simpleElement = app.getSimpleElement(element);
-    
-    // memoizing is recommended for expensive bind functions
-    var myFunction = simpleDirectives.memoize(function() { /* expensive logic */ }, refreshRate);
-</script>
 ```
 
-Directives on `element` and all children will be registered and start working.
+```javascript
+// place where you want, but after the dom has finished loading
+var app = simpleDirectives.register(element, root);
+```
+
+Directives on `element` and all children will be registered and start working immediately.
 
 `element` and `root` are optional and default to `document.body` and `window`.
 
-`refreshRate` is optional on memoized functions and will default to 1000ms.
+```javascript
+// if you want to inspect an element how simple-directives sees it
+var simpleElement = app.getSimpleElement(element);
+
+// memoizing is recommended for expensive bind functions
+var myFunction = simpleDirectives.memoize(function() { /* heavy logic */ }, refreshRate);
+// `refreshRate` is optional, is in milliseconds, and will default to 1000
+```
 
 Notes on vocabulary:
 
