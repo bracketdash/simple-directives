@@ -1,0 +1,24 @@
+{
+    "name": "simple-ajax",
+    "version": "2.0.0",
+    "description": "A simple AJAX library.",
+    "author": "Michael Hatch",
+    "license": "MIT",
+    "repository": {
+        "url": "https://github.com/bracketdash/simple-ajax.git"
+    },
+    "scripts": {
+        "build": "tsc && terser directives.js -o directives.min.js -c -m --timings && prettier --write \"directives.{ts,js}\" && pug ./docs"
+    },
+    "devDependencies": {
+        "jstransformer-markdown-it": "^2.1.0",
+        "markdown-it-named-headings": "^1.1.0",
+        "prettier": "^1.19.1",
+        "terser": "^4.6.3",
+        "typescript": "^3.7.5"
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "printWidth": 124
+    }
+}
