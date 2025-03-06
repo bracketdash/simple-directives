@@ -1,6 +1,6 @@
 # A Simple Directives Library
 
-Download: [directives.js](https://raw.githubusercontent.com/bracketdash/simple-directives/master/directives.js) or [directives.min.js](https://raw.githubusercontent.com/bracketdash/simple-directives/master/directives.min.js)
+Download: [directives.js](https://raw.githubusercontent.com/bracketdash/simple-directives/master/dist/directives.js) (39kb) or [directives.min.js](https://raw.githubusercontent.com/bracketdash/simple-directives/master/dist/directives.min.js) (13kb)
 
 ```html
 <!-- basic syntax -->

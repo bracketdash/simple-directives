@@ -8,8 +8,7 @@
         "url": "https://github.com/bracketdash/simple-directives.git"
     },
     "scripts": {
-        "build": "tsc && terser directives.js -o directives.min.js -c -m --timings && prettier --write \"directives.{ts,js}\"",
-        "build2": "tsc && mkdir -p dist && terser directives.js -o dist/directives.min.js -c -m --timings && prettier --write \"directives.ts\" \"dist/directives.js\" && mv directives.js dist/directives.js"
+        "build": "tsc && terser src/directives.js -o dist/directives.min.js -c -m --timings && mv src/directives.js dist/directives.js && prettier src/directives.ts dist/directives.js --write"
     },
     "devDependencies": {
         "prettier": "^1.19.1",
